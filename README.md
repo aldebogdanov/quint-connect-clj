@@ -140,6 +140,12 @@ and leave an annotation on `:quint/*`, nothing reads it and nothing warns you,
 unless the whole namespace scans empty. See
 [docs/decisions/0007-annotation-keys.md](docs/decisions/0007-annotation-keys.md).
 
+## Example
+
+[examples/lru/](examples/lru/) is a small LRU cache with a bug that only shows
+up after a particular interleaving of reads and writes — the kind of test
+nobody writes by hand. `cd examples/lru && clojure -M:test`.
+
 ## Requirements
 
 - Clojure 1.12+ on the JVM. ClojureScript is out of scope
@@ -154,6 +160,7 @@ unless the whole namespace scans empty. See
 ```
 src/uno/michelada/quint_connect/     library code (.clj)
 test/uno/michelada/quint_connect/    tests
+examples/lru/                        runnable example: an LRU cache
 dev/bank/                            annotated toy implementation of bank.qnt
 dev/fixtures/                        example Quint spec + recorded ITF traces
 dev/probes/                          scripts that verified the claims in the docs
