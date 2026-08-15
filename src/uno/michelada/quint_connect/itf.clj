@@ -1,0 +1,160 @@
+(ns uno.michelada.quint-connect.itf
+  "Decode Quint's ITF trace files into EDN. Pure: no file or process I/O.
+  What Quint emits, and why parts of it are odd, is in docs/notes/itf-format.md."
+  (:require [clojure.data.json :as json]
+            [clojure.string :as str]))
+
+(def ^:private action-var "mbt::actionTaken")
+(def ^:private picks-var "mbt::nondetPicks")
+
+;; `#unserializable` is absent on purpose: Quint's writer never emits it, so
+;; there is no recording to test against until Apalache traces arrive in M7.
+(def ^:private known-tags #{"#bigint" "#set" "#tup" "#map"})
+
+(defn- fail [error msg data]
+  (throw (ex-info msg (assoc data :quint/error error))))
+
+(defn- ->int
+  "Long when it fits, since (= 5N 5) is false and state is compared with =."
+  [^BigInteger n]
+  (try (.longValueExact n)
+       (catch ArithmeticException _ (bigint n))))
+
+(defn- decode-bigint [s]
+  (try (->int (BigInteger. ^String s))
+       (catch NumberFormatException _
+         (fail :bad-itf (str "#bigint is not an integer: " (pr-str s)) {:value s}))))
+
+(defn- bignumber?
+  "Strict: a genuine record can carry fields named s, e and c."
+  [m]
+  (let [{:strs [s e c]} m]
+    (and (= #{"s" "e" "c"} (set (keys m)))
+         (map? s) (contains? #{"1" "-1"} (get s "#bigint"))
+         (map? e) (contains? e "#bigint")
+         (vector? c) (seq c)
+         (every? #(and (map? %) (contains? % "#bigint")) c))))
+
+(defn- decode-bignumber
+  "The {s, e, c} form the rust backend leaks for |n| >= 10^15. Rule and
+  verification: docs/notes/itf-format.md §\"Large integers\"."
+  [m]
+  (let [sign   (decode-bigint (get-in m ["s" "#bigint"]))
+        exp    (decode-bigint (get-in m ["e" "#bigint"]))
+        chunks (map #(get % "#bigint") (get m "c"))
+        digits (apply str (first chunks)
+                      (map #(format "%014d" (BigInteger. ^String %)) (rest chunks)))
+        scale  (- (inc exp) (count digits))]
+    (when (neg? scale)
+      (fail :bad-itf "bignumber exponent is smaller than its digit count"
+            {:value m :exponent exp :digits (count digits)}))
+    (-> (BigInteger. ^String digits)
+        (.multiply (.pow BigInteger/TEN scale))
+        (.multiply (BigInteger/valueOf sign))
+        ->int)))
+
+(defn- decode-value [v]
+  (cond
+    (map? v)
+    (let [unknown (remove known-tags (filter #(str/starts-with? % "#") (keys v)))]
+      (cond
+        (seq unknown)
+        (fail :bad-itf
+              (str "unsupported ITF encoding " (pr-str (first unknown))
+                   (when (= "#unserializable" (first unknown))
+                     " — emitted by Apalache, not by Quint; supported in M7"))
+              {:value v :supported known-tags})
+
+        (contains? v "#bigint") (decode-bigint (get v "#bigint"))
+        (contains? v "#set")    (into #{} (map decode-value) (get v "#set"))
+        (contains? v "#tup")    (mapv decode-value (get v "#tup"))
+        (contains? v "#map")    (into {} (map (fn [[k x]] [(decode-value k) (decode-value x)]))
+                                      (get v "#map"))
+        (bignumber? v)          (decode-bignumber v)
+        ;; Records and sum-type variants are indistinguishable by shape, so a
+        ;; variant stays {:tag "Busy" :value 2}; users reshape it in a reader.
+        :else (reduce-kv (fn [acc k x] (assoc acc (keyword k) (decode-value x))) {} v)))
+
+    (vector? v) (mapv decode-value v)
+    :else       v))
+
+(defn- default-key-fn [full-name]
+  (keyword (peek (str/split full-name #"::"))))
+
+(defn- decode-picks
+  "Quint's runtime wraps every pick in Some/None regardless of what the spec
+  declares, so unwrapping here undoes Quint's own encoding, not the author's.
+  None means the pick was never bound, so the key is dropped."
+  [m]
+  (reduce-kv
+   (fn [acc k v]
+     (case (and (map? v) (get v "tag"))
+       "Some" (assoc acc (keyword k) (decode-value (get v "value")))
+       "None" acc
+       (fail :bad-itf (str "nondet pick " (pr-str k) " is not wrapped in Some/None")
+             {:pick k :value v})))
+   {} m))
+
+(defn- decode-state [key-fn state]
+  (reduce-kv
+   (fn [acc k v]
+     (condp = k
+       "#meta"    (assoc acc :index (get v "index"))
+       action-var (assoc acc :action v)
+       picks-var  (assoc acc :picks (decode-picks v))
+       (assoc-in acc [:state (key-fn k)] (decode-value v))))
+   {:action nil :picks {} :state {}}
+   state))
+
+(defn- check-collisions! [key-fn full-names]
+  (doseq [[k fulls] (reduce (fn [m f] (update m (key-fn f) (fnil conj #{}) f)) {} full-names)
+          :when (< 1 (count fulls))]
+    (fail :name-collision
+          (str "two spec variables both normalize to " k ": " (str/join ", " (sort fulls)))
+          {:key k :names (vec (sort fulls))})))
+
+(defn json->itf
+  "Parse ITF file contents. Takes the JSON as a string, returns the raw ITF map
+  with string keys and undecoded values. Throws `ex-info` with `:quint/error`
+  `:bad-itf` if it is not a JSON object."
+  [s]
+  (let [parsed (try (json/read-str s)
+                    (catch Exception e
+                      (fail :bad-itf (str "could not parse ITF JSON: " (ex-message e))
+                            {:cause (ex-message e)})))]
+    (if (map? parsed)
+      parsed
+      (fail :bad-itf "ITF must be a JSON object" {:parsed-type (type parsed)}))))
+
+(defn itf->trace
+  "Decode a parsed ITF map into a trace.
+
+  Takes the map from `json->itf` and optionally `{:key-fn f}`, where f maps a
+  full variable name to a keyword; it defaults to the last `::` segment and
+  never sees `mbt::` names. Names keep Quint's camelCase.
+
+  Returns
+
+    {:source \"bank.qnt\"
+     :vars   [:balances :lastError]
+     :states [{:index 0 :action \"init\" :picks {} :state {...}} ...]}
+
+  `:vars` comes from the state keys, not the file's `vars` array, which Quint
+  emits with duplicate `mbt::` entries. Traces without `mbt::` variables decode
+  with `:action` nil and `:picks` empty.
+
+  Throws `ex-info` with `:quint/error` `:bad-itf` for a malformed file or an
+  unsupported encoding, `:name-collision` when two variables normalize alike."
+  ([itf] (itf->trace itf nil))
+  ([itf opts]
+   (let [key-fn (get opts :key-fn default-key-fn)
+         states (get itf "states")]
+     (when-not (vector? states)
+       (fail :bad-itf "ITF has no states array" {:found (keys itf)}))
+     (let [full-names (into #{} (comp (mapcat keys)
+                                      (remove #{"#meta" action-var picks-var}))
+                            states)]
+       (check-collisions! key-fn full-names)
+       {:source (get-in itf ["#meta" "source"])
+        :vars   (vec (sort (map key-fn full-names)))
+        :states (mapv #(decode-state key-fn %) states)}))))

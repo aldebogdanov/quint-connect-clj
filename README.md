@@ -1,0 +1,177 @@
+# quint-connect
+
+Model-based testing for Clojure, driven by [Quint](https://quint-lang.org/)
+specifications.
+
+Status: **working, unreleased**. M1–M5 of
+[docs/roadmap.md](docs/roadmap.md) are done: decoding, replay, the annotation
+registry, the Quint CLI and the public API. `bb test` runs a real model-based
+test end to end. Failure artifacts (M6) and `verify` (M7) are next.
+
+## What it does
+
+You write a formal spec of your system in Quint. Quint generates traces from it
+(sequences of `state -> action -> state`). quint-connect starts your application,
+replays those traces against it, and fails the test at the first step where the
+application's state diverges from the specification's state.
+
+```
+spec.qnt  --quint run --mbt-->  ITF traces  --replay-->  your running app
+                                                  |
+                                            state diff on divergence
+```
+
+The mapping between spec and code is declared with metadata, next to the code it
+describes. The application never learns that Quint exists: no context argument,
+no return-value convention, no require. This is the Clojure counterpart of
+[quint-connect](https://github.com/quint-co/quint-connect) (Rust).
+
+## Coordinates
+
+```clojure
+uno.michelada/quint-connect {:mvn/version "…"}    ; Clojars, not released yet
+```
+
+## Usage
+
+Annotate the application. The keys are plain keywords needing no `require`, so
+an annotated namespace takes on no dependency — this library belongs in your
+`:test` alias and nowhere else. Actions take the `nondet` picks Quint made,
+bound by parameter name, and their return value is ignored:
+
+```clojure
+(ns bank.core)                                        ; no :require, no deps
+
+(def ^{:quint/state :balances} accounts (atom {}))
+
+(defn deposit
+  {:quint/action "deposit"}
+  [who amount]
+  (swap! accounts update who (fnil + 0) amount))
+
+(defn withdraw
+  {:quint/action "withdraw"}
+  [who amount]
+  (when (>= (get @accounts who 0) amount)
+    (swap! accounts update who - amount)))
+```
+
+State is read back from whatever declares itself as state — an atom, a ref, or a
+getter function. Getters can live in the test namespace when the application has
+none of its own:
+
+```clojure
+(ns bank.model-test
+  (:require [bank.core :as bank]
+            [clojure.test :refer [deftest]]
+            [uno.michelada.quint-connect.core :as q]           ; the API
+            [uno.michelada.quint-connect.test :as qt]))        ; the clojure.test bridge
+
+(defn last-error                             ; called with no arguments
+  {:quint/state :lastError}
+  []
+  (bank/current-error))
+
+(defn reset-app {:quint/init true} []   ; runs once per trace, before step 0
+  (reset! bank/accounts {"alice" 0 "bob" 0}))
+
+(q/defdriver bank
+  {:spec "spec/bank.qnt"
+   :main "bankTest"
+   :scan '[bank.core bank.model-test]        ; namespaces to read annotations from
+
+   ;; anything that is not one function call goes here, and wins on conflict
+   :actions {"transfer" (fn [{:keys [from to amount]}] ...)}})
+
+(deftest bank-conforms-to-spec
+  (qt/check bank {:traces 50 :max-steps 20 :seed 42}))
+```
+
+Careful — this is the one syntax trap. Metadata must sit on the *symbol* or in
+the attr-map, never on the `(defn ...)` form:
+
+```clojure
+(defn ^{:quint/action "deposit"} deposit [who amount] ...)  ; works
+(defn deposit {:quint/action "deposit"} [who amount] ...)   ; works
+^{:quint/action "deposit"} (defn deposit [who amount] ...)  ; SILENTLY IGNORED
+```
+
+`q/check` is an ordinary function returning ordinary data, so it works from the
+REPL, from `clojure.test`, from Kaocha, or from anything else. `qt/check` is the
+one-line bridge that turns that data into an assertion.
+
+When the implementation diverges, that assertion fails with:
+
+```
+spec and implementation diverged on trace 0 of 5, seed 42
+diverged at step 6, action "deposit"
+  picks    {:amount 11, :who "alice"}
+  handler  #'bank.core/deposit
+  readers  {:balances #'bank.core/accounts}
+  expected {:balances {"alice" 11, "bob" 0}}
+  actual   {:balances {"alice" 12, "bob" 0}}
+  in spec  {:balances {"alice" 11}}
+  in app   {:balances {"alice" 12}}
+  reproduce  cd spec && quint run bank.qnt --mbt --seed=42 ...
+```
+
+The handler and reader vars are the payoff of declaring the mapping next to the
+code: the failure points at the function that diverged and at the one that
+observed it. The reproduce line is pasteable.
+
+### About the keys
+
+Five keys, qualified by `quint`, requiring nothing: `:quint/action`,
+`:quint/args`, `:quint/state`, `:quint/init`, `:quint/halt`.
+
+`quint` is a shared keyword namespace and the Quint project's name, not ours,
+so a driver can move the whole vocabulary out of the way:
+
+```clojure
+(q/defdriver bank
+  {:spec   "spec/bank.qnt"
+   :scan   '[bank.core]
+   :key-ns 'acme.mbt})          ; now reads :acme.mbt/action, :acme.mbt/state, …
+```
+
+`:key-ns` moves all five keys together; there is no per-key override and no
+second spelling within one driver. Note the sharp edge: if you set `:key-ns`
+and leave an annotation on `:quint/*`, nothing reads it and nothing warns you,
+unless the whole namespace scans empty. See
+[docs/decisions/0007-annotation-keys.md](docs/decisions/0007-annotation-keys.md).
+
+## Requirements
+
+- Clojure 1.12+ on the JVM. ClojureScript is out of scope
+  ([decision](docs/decisions/0005-clojure-only.md)).
+- [Quint](https://github.com/informalsystems/quint) on `PATH` for trace
+  *generation* (developed against 0.32.0). Trace *replay* needs nothing but
+  Clojure — cached ITF files run in CI without Quint installed.
+- Apalache (fetched by `quint verify`) only for the verification mode.
+
+## Repository layout
+
+```
+src/uno/michelada/quint_connect/     library code (.clj)
+test/uno/michelada/quint_connect/    tests
+dev/bank/                            annotated toy implementation of bank.qnt
+dev/fixtures/                        example Quint spec + recorded ITF traces
+dev/probes/                          scripts that verified the claims in the docs
+docs/architecture.md
+docs/roadmap.md
+docs/decisions/                      ADRs — why the design is what it is
+docs/notes/                          observed behaviour of Quint and of var metadata
+CLAUDE.md                            working agreement for AI-assisted changes
+```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). `bb test` needs nothing but Clojure;
+`bb test:all` additionally needs `quint` on `PATH`.
+
+## License
+
+Copyright © 2026 Michelada
+
+Distributed under the [Eclipse Public License 2.0](LICENSE), the same license
+as Clojure itself.

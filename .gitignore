@@ -1,0 +1,13 @@
+.cpcache/
+.clj-kondo/.cache/
+.lsp/.cache/
+target/
+out/
+dev/tmp/
+node_modules/
+.DS_Store
+.claude/settings.local.json
+*.log
+
+# Traces written by failing runs; promote them to test-resources/ deliberately.
+test-resources/quint-connect/failures/

@@ -1,0 +1,10 @@
+{:tasks
+ {test     {:doc  "Run tests that need no Quint installed"
+            :task (shell "clojure -M:test -e :integration")}
+
+  test:all {:doc  "Run every test, including those that shell out to quint"
+            :task (shell "clojure -M:test")}
+
+  fixtures {:doc  "Regenerate ITF fixtures from dev/fixtures/bank.qnt"
+            :task (shell {:dir "dev/fixtures"}
+                         "quint run bank.qnt --main=bankTest --mbt --seed=42 --max-steps=4 --n-traces=2 --max-samples=2 --out-itf=bank_run_{seq}.itf.json --verbosity=0")}}}
