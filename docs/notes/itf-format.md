@@ -37,9 +37,13 @@ derive the real variable set from the state keys.
 | `(7, "seven")`   | `{"#tup": [{"#bigint": "7"}, "seven"]}`            | `[7 "seven"]`              |
 | `{x: 1, y: "w"}` | `{"x": {"#bigint": "1"}, "y": "w"}`                | `{:x 1 :y "w"}`            |
 | `Map(1 -> ...)`  | `{"#map": [[key, value], ...]}`                    | `{1 ...}`                  |
+| `["x", "y"]`     | `["x", "y"]`                                       | `["x" "y"]`                |
 | sum type variant | `{"tag": "Busy", "value": {"#bigint": "2"}}`       | design decision, see below |
 | `Some(5)`        | `{"tag": "Some", "value": {"#bigint": "5"}}`       | `5`                        |
 | `None`           | `{"tag": "None", "value": {"#tup": []}}`           | absent / `nil`             |
+
+A `List` has no tag of its own: it is a bare JSON array, which is the one
+encoding that looks like nothing in particular. Fixture: `shapes_0.itf.json`.
 
 `Option` is not built in — a spec must define
 `type Option[a] = Some(a) | None` itself (or import `basicSpells`). It is still

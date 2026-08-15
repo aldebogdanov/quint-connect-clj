@@ -40,7 +40,7 @@
 (deftest shapes-decodes-every-encoding
   (let [t       (trace "shapes_0.itf.json")
         [s0 s1] (:states t)]
-    (is (= [:aBigInt :aBool :aRec :aSet :aStatus :aTup :anOpt :nested] (:vars t))
+    (is (= [:aBigInt :aBool :aList :aRec :aSet :aStatus :aTup :anOpt :nested] (:vars t))
         "camelCase kept, not kebab-cased")
     (is (= {:aSet    #{1 2 3}
             :aTup    [7 "seven"]
@@ -49,14 +49,17 @@
             :aStatus {:tag "Busy" :value 2}
             :aBool   true
             :aBigInt 9007199254740993
-            :nested  {1 #{"a"} 2 #{}}}
+            :nested  {1 #{"a"} 2 #{}}
+            ;; a Quint List is a bare JSON array, with no #tag of its own
+            :aList   ["x" "y"]}
            (:state s0)))
     (is (= {} (:picks s0)) "shapes.qnt has no nondet")
 
     (testing "Some/None in a spec-declared variable is left wrapped"
       (is (= {:tag "None" :value []} (:anOpt (:state s1))))
       (is (= {:tag "Named" :value {:who "bob" :n 3}} (:aStatus (:state s1))))
-      (is (= 9007199254740994 (:aBigInt (:state s1)))))))
+      (is (= 9007199254740994 (:aBigInt (:state s1))))
+      (is (= ["x" "y" "z"] (:aList (:state s1))) "lists decode to vectors"))))
 
 (deftest bigint-backends-agree
   ;; The {s,e,c} reconstruction is right exactly when it produces what the

@@ -9,7 +9,7 @@ the commands in [../../docs/notes/itf-format.md](../../docs/notes/itf-format.md)
 | `bank.qnt`                                  | toy spec: `bank`, `bankTest` (simulation), `bankRuns` (scripted run) |
 | `bank_run_0/1.itf.json`                     | `quint run --mbt`, seed 42 — the normal case              |
 | `bank_test_depositThenWithdrawTest.itf.json`| `quint test` — note the absent `mbt::` variables          |
-| `shapes.qnt`, `shapes_0.itf.json`           | one instance of every ITF value encoding                  |
+| `shapes.qnt`, `shapes_0.itf.json`           | one instance of every ITF value encoding, lists included  |
 | `bigint.qnt`, `bigint_rust_0.itf.json`      | large-integer serialization quirk on the rust backend     |
 | `bigint_typescript_0.itf.json`              | the same spec, encoded correctly by the typescript backend |
 | `collide.qnt`, `collide_0.itf.json`         | one module instantiated twice, so two variables end in `::n` — decodes only with a `:key-fn` |

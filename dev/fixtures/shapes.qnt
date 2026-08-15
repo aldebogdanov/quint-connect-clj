@@ -11,6 +11,7 @@ module shapes {
   var aBool: bool
   var aBigInt: int
   var nested: int -> Set[str]
+  var aList: List[str]
 
   action init = all {
     aSet' = Set(3, 1, 2),
@@ -21,6 +22,7 @@ module shapes {
     aBool' = true,
     aBigInt' = 9007199254740993,
     nested' = Map(1 -> Set("a"), 2 -> Set()),
+    aList' = ["x", "y"],
   }
 
   action bump = all {
@@ -32,6 +34,7 @@ module shapes {
     aBool' = false,
     aBigInt' = aBigInt + 1,
     nested' = nested,
+    aList' = aList.append("z"),
   }
 
   action step = bump
