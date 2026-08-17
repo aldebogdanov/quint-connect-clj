@@ -217,7 +217,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). `bb test` needs nothing but Clojure;
 
 ## License
 
-Copyright © 2026 Sasha V. Bogdanov
+Copyright © 2026 Aleksandr Bogdanov
 
 Distributed under the [Eclipse Public License 2.0](LICENSE), the same license
 as Clojure itself.

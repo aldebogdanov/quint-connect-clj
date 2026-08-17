@@ -30,7 +30,7 @@ The artifact name `quint-connect` is untouched, and so is the
 rather than the group.
 
 The copyright followed the group. `LICENSE` and the README read "Copyright ©
-2026 Sasha V. Bogdanov"; the licence itself is unchanged and still EPL-2.0.
+2026 Aleksandr Bogdanov"; the licence itself is unchanged and still EPL-2.0.
 That was an ownership decision rather than a naming one, which is why it is
 recorded here as a fact and not argued for.
 
