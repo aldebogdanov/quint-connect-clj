@@ -29,9 +29,16 @@ The artifact name `quint-connect` is untouched, and so is the
 `test-resources/quint-connect/` directory, which is named after the artifact
 rather than the group.
 
-`LICENSE` still reads "Copyright © 2026 Michelada". Whether that follows the
-group is an ownership question, not a naming one, and is deliberately left
-alone here.
+The copyright followed the group. `LICENSE` and the README read "Copyright ©
+2026 Sasha V. Bogdanov"; the licence itself is unchanged and still EPL-2.0.
+That was an ownership decision rather than a naming one, which is why it is
+recorded here as a fact and not argued for.
+
+`LICENSE` had carried no copyright line at all before this — only the bare EPL
+text, whose Exhibit A explicitly invites one ("You may add additional accurate
+notices of copyright ownership"). It has one now. Published artifacts are
+unaffected either way: the jar contains `src/` and the pom, not `LICENSE`, and
+the pom has only ever named the licence, never a holder.
 
 ## Coordinates
 
