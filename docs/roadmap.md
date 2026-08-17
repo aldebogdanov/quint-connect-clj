@@ -171,16 +171,22 @@ is a prerequisite for both, since neither `quint test` nor `quint verify` emits
   pass, and replay the counterexample against the implementation when it does
   not.
 - The behaviour this rests on is recorded in
-  [notes/itf-format.md](notes/itf-format.md) §`quint verify`: exit 1 means
-  either a counterexample or a broken spec and only the wording tells them
-  apart, the trace is Apalache's ITF dialect with no `#meta.source`, and a run
-  can take minutes.
-- Open question, to be answered by a probe first: Apalache writes
-  `_apalache-out/` into the working directory, which is the user's spec
-  directory. Likely fixed with an out-dir in `--apalache-config`; not verified.
+  [notes/itf-format.md](notes/itf-format.md) §`quint verify` and reproducible
+  with [`dev/probes/verify_probe.sh`](../dev/probes/verify_probe.sh).
+- The open question is answered, and not the way it was guessed.
+  `--apalache-config` does **not** move `_apalache-out/`, and the name is
+  Apalache's to choose, not ours. What it does follow is the working directory,
+  so running `verify` in a scratch directory contains it and deletes it — at
+  the cost of the untested "sibling modules resolve" rationale for running in
+  the spec's own directory, which is the one thing left to decide.
+- All four failure modes exit 1. The discriminator is whether a trace was
+  written, not the exit code and not the wording.
+- An invariant that holds writes no trace, so zero traces is the pass and
+  `verify!` cannot reuse `:no-traces`.
 - Needs its own test tag and `bb` task, so `bb test:all` stays fast.
-- `#unserializable` stays deferred: the counterexample recorded so far contains
-  none, and there is still no recording to decode against.
+- `#unserializable` stays deferred, now with a recording to back that up: the
+  counterexample contains none, and the dialect decodes through `itf`
+  unchanged. M7b does not grow that namespace.
 
 **Done when:** a spec with a deliberate invariant violation produces a
 counterexample that replays against the implementation.

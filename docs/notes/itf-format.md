@@ -112,22 +112,70 @@ must say so in the error message.
 
 ### `quint verify`, recorded 2026-08-17 on 0.32.0 with Apalache 0.56.1
 
-Recorded while planning M7b; none of it is implemented yet.
+Not implemented yet; this is what M7b is designed against. Everything below is
+reproducible with [`dev/probes/verify_probe.sh`](../../dev/probes/verify_probe.sh).
 
-- The invariant holding is exit **0**, `[ok] No violation found (3977ms)`.
-- A violation is exit **1**, `error: found a counterexample`, and the trace is
-  written to `--out-itf`. So exit 1 alone cannot be read as failure: the words
-  have to be checked.
-- `--out-itf` is documented as suppressing console output. It does not — the
-  counterexample states were still printed.
-- The counterexample is Apalache's own ITF dialect: `#meta.varTypes` is
-  present, **`#meta.source` is absent**, and there are no `mbt::` variables.
-- Apalache 0.56.1 is downloaded on first use (~2 minutes) and runs as a server
-  on port 8822. It exits with the command — no orphan JVM was left behind.
-- It writes an `_apalache-out/` directory into the working directory, which is
-  the spec's own directory the way quint-connect invokes Quint today.
-- Cost is spec-dependent and can be large: 4 s to confirm `noNegatives`, 114 s
-  to find a counterexample to `balances.get(a) <= 50` on the toy bank.
+**Outcome is not in the exit code.** All four failure modes exit 1, so the
+number distinguishes nothing. What does distinguish them is whether a trace was
+written:
+
+| outcome              | exit | `--out-itf` | first line of output                        |
+| -------------------- | ---- | ----------- | ------------------------------------------- |
+| invariant holds      | 0    | no file     | silent at `--verbosity=0`                   |
+| counterexample       | 1    | **written** | `error: found a counterexample`             |
+| unknown invariant    | 1    | no file     | `error: [QNT404] Name '…' not found`        |
+| spec does not typecheck | 1 | no file     | ` Error [QNT000]: Couldn't unify int and str` |
+| spec file missing    | 1    | no file     | `error: file … does not exist`              |
+
+So the discriminator is **exit 1 with a trace** = counterexample, **exit 1
+without one** = broken setup, and the wording belongs in the error message
+rather than in the branch. The alternative — matching `found a counterexample`
+— works too, but it is a string in someone else's release notes.
+
+An invariant that holds writes no file at all. Zero traces is therefore the
+*pass*, which is why `verify!` cannot reuse the `:no-traces` error that `run!`
+and `test!` raise on an empty result.
+
+**`_apalache-out/` follows the working directory, not the spec.** Running from
+an unrelated directory with an absolute path to the spec puts it in that
+directory and leaves the spec's own alone. That is what lets it be contained:
+run `quint verify` in a scratch directory and it is deleted along with it.
+
+It cannot be renamed. `--apalache-config` with `common.out-dir` is ignored —
+relative or absolute, and `write-intermediate` with it — and a config file
+containing an unknown key still exits 0, so the file is not being validated and
+may not be forwarded at all. The name `_apalache-out` is Apalache's; only the
+directory it appears in is ours to choose.
+
+Its contents are logs, not results: `_apalache-out/server/<timestamp>/` holding
+`log0.smt`, `detailed.log` and `run.txt`.
+
+**The dialect needs nothing from the decoder.** A recorded counterexample
+decodes through `uno.michelada.quint-connect.itf` unchanged: `#meta` carries
+`format`, `varTypes`, `format-description` and `description`, so `:source`
+comes out nil and `varTypes` is ignored along with the rest of `#meta`. Values
+are plain `#bigint` and records. **No `#unserializable`** — so it stays
+deferred, there is still no recording to decode against, and `itf.clj` does not
+have to grow for M7b.
+
+There are no `mbt::` variables, so `:action` decodes nil and replay reports
+`:unknown-action` pointing at `:action-path` — the same contract `quint test`
+traces already have.
+
+**Other observations.** Apalache 0.56.1 is downloaded on first use (~2 minutes,
+once) into `~/.quint/apalache-dist-0.56.1` and runs as a server on port 8822; it
+exits with the command and left no orphan JVM. `--out-itf` is documented as
+suppressing console output and does not — the counterexample states are still
+printed unless `--verbosity=0` is also passed. Cost is spec-dependent and can be
+large: 5 s to confirm `nonNegative` on a two-action counter, 114 s to find a
+counterexample to `balances.get(a) <= 50` on the toy bank.
+
+**Unverified, and left that way.** `quint.clj` runs Quint in the spec's own
+directory partly "so sibling modules resolve". That rationale is untested: no
+form of `import lib.* from "./lib.qnt"` would load on 0.32.0 — not `./lib.qnt`,
+not `./lib`, not `lib`, with the imported file parsing fine on its own — so no
+working cross-file import could be built to test it either way. If M7b runs
+`verify` from a scratch directory, this is the assumption it rests on.
 
 ## Large integers: a real trap
 
