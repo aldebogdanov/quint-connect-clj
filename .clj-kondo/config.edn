@@ -1,0 +1,5 @@
+;; `defdriver` is `(def name (driver m))` and nothing more, but clj-kondo
+;; cannot know that without expanding the macro, so every driver name reads as
+;; an unresolved symbol at its use sites. Linting it as `def` is the whole fix;
+;; a hook would buy nothing until it also checks the driver map, which is M8.
+{:lint-as {uno.michelada.quint-connect.core/defdriver clojure.core/def}}

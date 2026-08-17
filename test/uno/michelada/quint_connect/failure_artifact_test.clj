@@ -4,7 +4,7 @@
   hand, around a real recorded trace."
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
-            [clojure.test :refer [deftest is testing]]
+            [clojure.test :refer [deftest is]]
             [uno.michelada.quint-connect.report :as report]
             [uno.michelada.quint-connect.test :as qt])
   (:import (java.nio.file Files)
