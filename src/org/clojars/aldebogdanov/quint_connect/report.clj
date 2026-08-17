@@ -1,4 +1,4 @@
-(ns uno.michelada.quint-connect.report
+(ns org.clojars.aldebogdanov.quint-connect.report
   "Result data -> string. A consumer of what replay returns, never a second
   source of truth about it."
   (:require [clojure.string :as str]))

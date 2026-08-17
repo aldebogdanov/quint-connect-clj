@@ -1,12 +1,12 @@
-(ns uno.michelada.quint-connect.failure-artifact-test
+(ns org.clojars.aldebogdanov.quint-connect.failure-artifact-test
   "What happens to a failure after it is found: it becomes a file. Producing
   one takes Quint and lives in end-to-end-test; here the result map is built by
   hand, around a real recorded trace."
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.test :refer [deftest is]]
-            [uno.michelada.quint-connect.report :as report]
-            [uno.michelada.quint-connect.test :as qt])
+            [org.clojars.aldebogdanov.quint-connect.report :as report]
+            [org.clojars.aldebogdanov.quint-connect.test :as qt])
   (:import (java.nio.file Files)
            (java.nio.file.attribute FileAttribute)))
 

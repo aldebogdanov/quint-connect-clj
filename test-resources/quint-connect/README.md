@@ -2,7 +2,7 @@
 
 Two places, on purpose.
 
-`failures/` is where `uno.michelada.quint-connect.test/save-failure!` drops the
+`failures/` is where `test/save-failure!` drops the
 trace of a divergence, every time one happens. It is **gitignored**: a failing
 run must not dirty the repository on its own.
 

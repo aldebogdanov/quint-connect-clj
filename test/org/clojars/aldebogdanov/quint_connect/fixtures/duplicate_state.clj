@@ -1,4 +1,4 @@
-(ns uno.michelada.quint-connect.fixtures.duplicate-state)
+(ns org.clojars.aldebogdanov.quint-connect.fixtures.duplicate-state)
 
 (def ^{:quint/state :balances} from-an-atom (atom {}))
 

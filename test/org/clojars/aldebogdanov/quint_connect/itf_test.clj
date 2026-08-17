@@ -1,7 +1,7 @@
-(ns uno.michelada.quint-connect.itf-test
+(ns org.clojars.aldebogdanov.quint-connect.itf-test
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
-            [uno.michelada.quint-connect.itf :as itf]))
+            [org.clojars.aldebogdanov.quint-connect.itf :as itf]))
 
 (defn- fixture [name]
   (itf/json->itf (slurp (str "dev/fixtures/" name))))

@@ -1,10 +1,10 @@
-(ns uno.michelada.quint-connect.test
+(ns org.clojars.aldebogdanov.quint-connect.test
   "clojure.test integration: one assertion carrying the whole failure, and the
   failing trace written where a regression test can replay it."
   (:require [clojure.java.io :as io]
             [clojure.test :as t]
-            [uno.michelada.quint-connect.core :as core]
-            [uno.michelada.quint-connect.report :as report]))
+            [org.clojars.aldebogdanov.quint-connect.core :as core]
+            [org.clojars.aldebogdanov.quint-connect.report :as report]))
 
 (def default-failure-dir
   "Where a failing trace lands unless `:save-failure` names somewhere else. A

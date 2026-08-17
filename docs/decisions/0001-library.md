@@ -10,7 +10,7 @@ Kaocha plugin, or a standalone `quint-connect` test runner?
 
 Neither, first. The core is a library whose entry point is an ordinary
 function: `(q/check driver opts)` -> result map. A thin `clojure.test` bridge is
-provided in `uno.michelada.quint-connect.test`. A Kaocha plugin may follow later as a separate,
+provided in `test`. A Kaocha plugin may follow later as a separate,
 optional artifact.
 
 ## Why
@@ -34,7 +34,7 @@ in the loop at all.
 
 ## Consequences
 
-- `uno.michelada.quint-connect.test` must keep its assertion output useful, since that is where
+- `test` must keep its assertion output useful, since that is where
   most users will meet failures.
 - The result map is public API and gets treated as such.
 - A Kaocha plugin, if it happens, lives in its own directory with its own

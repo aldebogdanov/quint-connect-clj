@@ -1,4 +1,4 @@
-(ns uno.michelada.quint-connect.quint-test
+(ns org.clojars.aldebogdanov.quint-connect.quint-test
   "These shell out to the real quint. They are the only tests that need it
    installed; everything downstream runs on committed traces."
   (:require [clojure.java.io :as io]
@@ -6,8 +6,8 @@
             [clojure.set :as set]
             [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
-            [uno.michelada.quint-connect.itf :as itf]
-            [uno.michelada.quint-connect.quint :as quint]))
+            [org.clojars.aldebogdanov.quint-connect.itf :as itf]
+            [org.clojars.aldebogdanov.quint-connect.quint :as quint]))
 
 (def ^:private spec "dev/fixtures/bank.qnt")
 

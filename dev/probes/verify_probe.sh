@@ -100,5 +100,5 @@ print('   #meta.varTypes  :', 'present' if 'varTypes' in meta else 'absent')
 print('   #unserializable :', 'present' if 'unserializable' in json.dumps(d) else 'absent')
 print('   value encodings :', 'plain #bigint / records, nothing the decoder lacks')
 PY
-echo '   -> decodes through uno.michelada.quint-connect.itf unchanged, with'
+echo '   -> decodes through org.clojars.aldebogdanov.quint-connect.itf unchanged, with'
 echo '      :source nil and no action, so :action-path is required to replay it'

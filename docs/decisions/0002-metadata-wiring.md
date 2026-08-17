@@ -101,7 +101,7 @@ the short form, never a DSL in the making.
 
 - Production namespaces carry annotation keys and one `:require` of the keys
   namespace, and nothing else.
-- `uno.michelada.quint-connect.registry` is the only namespace that reflects, over an explicit
+- `registry` is the only namespace that reflects, over an explicit
   list of namespaces.
 - Readers run once per step, so they must be cheap and free of side effects
   that matter.

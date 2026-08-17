@@ -40,9 +40,9 @@ second accepted spelling within one driver.
 
 ## Why this reverses 0006
 
-0006 chose `:uno.michelada.quint-connect/action`, reached through an alias, to
-avoid squatting on a shared keyword namespace. The reasoning was sound and the
-cost was mispriced.
+0006 chose `:org.clojars.aldebogdanov.quint-connect/action`, reached through an
+alias, to avoid squatting on a shared keyword namespace. The reasoning was sound
+and the cost was mispriced.
 
 That cost was one `:require` in application code — which means the library is a
 dependency of the application, not of its tests. For a testing tool that is the
@@ -59,9 +59,10 @@ rejected it before the dependency-direction cost was on the table.
 
 ## What this removes
 
-The keys namespace `uno.michelada.quint-connect` is deleted. It existed only to
-be aliased, and nothing aliases it now. `src/uno/michelada/quint_connect/` holds
-ordinary library code and nothing else.
+The keys namespace `org.clojars.aldebogdanov.quint-connect` is deleted. It
+existed only to be aliased, and nothing aliases it now.
+`src/org/clojars/aldebogdanov/quint_connect/` holds ordinary library code and
+nothing else.
 
 `:misqualified-key` is dropped along with it. It caught exactly one mistake — an
 alias pointing at the API namespace — and without aliases that mistake cannot be

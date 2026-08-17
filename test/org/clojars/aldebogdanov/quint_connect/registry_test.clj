@@ -1,12 +1,18 @@
-(ns uno.michelada.quint-connect.registry-test
+(ns org.clojars.aldebogdanov.quint-connect.registry-test
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
-            [uno.michelada.quint-connect.itf :as itf]
-            [uno.michelada.quint-connect.registry :as registry]
-            [uno.michelada.quint-connect.replay :as replay]
-            [uno.michelada.quint-connect.fixtures.bank :as bank]
-            [uno.michelada.quint-connect.fixtures.forms :as forms]
-            [uno.michelada.quint-connect.fixtures.restart :as restart]))
+            [org.clojars.aldebogdanov.quint-connect.itf :as itf]
+            [org.clojars.aldebogdanov.quint-connect.registry :as registry]
+            [org.clojars.aldebogdanov.quint-connect.replay :as replay]
+            [org.clojars.aldebogdanov.quint-connect.fixtures.bank :as bank]
+            [org.clojars.aldebogdanov.quint-connect.fixtures.forms :as forms]
+            [org.clojars.aldebogdanov.quint-connect.fixtures.restart :as restart]))
+
+(defn- fixture
+  "A fixture namespace, by its last segment. The full names run to 47
+  characters, which wraps every :scan in this file without this."
+  [n]
+  (symbol (str "org.clojars.aldebogdanov.quint-connect.fixtures." (name n))))
 
 (defn- error-of [f]
   (try (f) nil (catch clojure.lang.ExceptionInfo e (:quint/error (ex-data e)))))
@@ -18,7 +24,7 @@
 
 (deftest scanned-driver-replays-the-committed-trace
   (let [d (registry/resolve-driver
-           {:scan '[uno.michelada.quint-connect.fixtures.bank]})
+           {:scan [(fixture :bank)]})
         r (replay/run-trace d (trace "bank_run_0.itf.json"))]
     (is (:ok? r))
     (is (= 5 (:steps r)))
@@ -26,7 +32,7 @@
 
 (deftest resolved-shape-is-what-m2-consumes
   (let [d (registry/resolve-driver
-           {:scan '[uno.michelada.quint-connect.fixtures.bank]})]
+           {:scan [(fixture :bank)]})]
     (is (= #{"deposit" "withdraw" "overdraft"} (set (keys (:actions d)))))
     (is (= #'bank/deposit (get-in d [:actions "deposit" :var])))
     (is (= #'bank/reset-app! (get-in d [:init :var])))
@@ -35,14 +41,14 @@
 
 (deftest picks-bind-by-parameter-name
   (let [d (registry/resolve-driver
-           {:scan '[uno.michelada.quint-connect.fixtures.bank]})]
+           {:scan [(fixture :bank)]})]
     (bank/reset-app!)
     ((get-in d [:actions "deposit" :fn]) {:amount 7 :who "alice"})
     (is (= 7 (get @bank/accounts "alice")) "bound by name, not by position in the map")))
 
 (deftest quint-args-overrides-arglists
   (let [d (registry/resolve-driver
-           {:scan '[uno.michelada.quint-connect.fixtures.bank]})]
+           {:scan [(fixture :bank)]})]
     (bank/reset-app!)
     ;; withdraw's parameters are [account n]; :quint/args says [:who :amount]
     ((get-in d [:actions "withdraw" :fn]) {:who "alice" :amount 3})
@@ -52,7 +58,7 @@
 
 (deftest reader-forms
   (let [d       (registry/resolve-driver
-                 {:scan '[uno.michelada.quint-connect.fixtures.forms]})
+                 {:scan [(fixture :forms)]})
         readers (:readers d)
         state   (reduce merge {} (map #((:fn %)) readers))]
     (testing ":path reads through a nested value"
@@ -67,7 +73,7 @@
 (deftest ireference-metadata-is-read
   ;; last-error carries its annotation on the atom, not on the var.
   (let [d (registry/resolve-driver
-           {:scan '[uno.michelada.quint-connect.fixtures.bank]})
+           {:scan [(fixture :bank)]})
         supplied (into #{} (mapcat #(keys ((:fn %)))) (:readers d))]
     (is (= #{:balances :lastError} supplied))))
 
@@ -76,7 +82,7 @@
 (deftest driver-map-overrides-the-scan
   (let [called (atom nil)
         d (registry/resolve-driver
-           {:scan    '[uno.michelada.quint-connect.fixtures.bank]
+           {:scan    [(fixture :bank)]
             :actions {"deposit" (fn [picks] (reset! called picks))}
             :state   {:lastError (fn [] "from-the-map")}})]
     ((get-in d [:actions "deposit" :fn]) {:who "bob"})
@@ -88,7 +94,7 @@
 
 (deftest passthrough-keys-survive
   (let [d (registry/resolve-driver
-           {:scan '[uno.michelada.quint-connect.fixtures.bank]
+           {:scan [(fixture :bank)]
             :spec "spec/bank.qnt" :main "bankTest" :init-action "init"
             :ignore #{:lastError} :compare {:balances =}})]
     (is (= "spec/bank.qnt" (:spec d)))
@@ -102,7 +108,7 @@
 
 (deftest empty-scan-names-the-defn-form-trap
   (let [e (try (registry/resolve-driver
-                {:scan '[uno.michelada.quint-connect.fixtures.bare]})
+                {:scan [(fixture :bare)]})
                (catch clojure.lang.ExceptionInfo ex ex))]
     (is (= :empty-scan (:quint/error (ex-data e))))
     (is (str/includes? (ex-message e) "(defn ...)")
@@ -111,16 +117,16 @@
 (deftest ambiguous-arity-is-rejected
   (is (= :ambiguous-arity
          (error-of #(registry/resolve-driver
-                     {:scan '[uno.michelada.quint-connect.fixtures.ambiguous]})))))
+                     {:scan [(fixture :ambiguous)]})))))
 
 (deftest duplicate-action-is-rejected
   (is (= :duplicate-action
          (error-of #(registry/resolve-driver
-                     {:scan '[uno.michelada.quint-connect.fixtures.duplicate]})))))
+                     {:scan [(fixture :duplicate)]})))))
 
 (deftest duplicate-state-is-rejected
   (let [e (try (registry/resolve-driver
-                {:scan '[uno.michelada.quint-connect.fixtures.duplicate-state]})
+                {:scan [(fixture :duplicate-state)]})
                (catch clojure.lang.ExceptionInfo ex ex))]
     (is (= :duplicate-state (:quint/error (ex-data e))))
     (testing "the message names both vars, or it cannot be acted on"
@@ -132,7 +138,7 @@
   ;; Two in one namespace: scan-ns used to keep whichever ns-interns yielded
   ;; last, so the other reset simply never ran.
   (let [e (try (registry/resolve-driver
-                {:scan '[uno.michelada.quint-connect.fixtures.duplicate-init]})
+                {:scan [(fixture :duplicate-init)]})
                (catch clojure.lang.ExceptionInfo ex ex))]
     (is (= :duplicate-init (:quint/error (ex-data e))))
     (is (str/includes? (ex-message e) ":quint/init") "the message names the key")
@@ -145,25 +151,23 @@
   (testing "init, the collision a :scan list grows into"
     (is (= :duplicate-init
            (error-of #(registry/resolve-driver
-                       {:scan '[uno.michelada.quint-connect.fixtures.bank
-                                uno.michelada.quint-connect.fixtures.restart]})))))
+                       {:scan [(fixture :bank) (fixture :restart)]})))))
   (testing "halt, the same way"
     (is (= :duplicate-halt
            (error-of #(registry/resolve-driver
-                       {:scan '[uno.michelada.quint-connect.fixtures.forms
-                                uno.michelada.quint-connect.fixtures.restart]}))))))
+                       {:scan [(fixture :forms) (fixture :restart)]}))))))
 
 (deftest one-of-each-still-resolves
   ;; The guard counts init and halt separately, so a namespace declaring both
   ;; is the ordinary case and not a collision.
   (let [d (registry/resolve-driver
-           {:scan '[uno.michelada.quint-connect.fixtures.restart]})]
+           {:scan [(fixture :restart)]})]
     (is (= #'restart/start! (get-in d [:init :var])))
     (is (= #'restart/stop! (get-in d [:halt :var])))))
 
 (deftest duplicate-action-message-names-both-vars
   (let [e (try (registry/resolve-driver
-                {:scan '[uno.michelada.quint-connect.fixtures.duplicate]})
+                {:scan [(fixture :duplicate)]})
                (catch clojure.lang.ExceptionInfo ex ex))]
     (is (str/includes? (ex-message e) "deposit-one"))
     (is (str/includes? (ex-message e) "deposit-two"))))
@@ -174,15 +178,15 @@
   (testing "the default qualifier finds nothing under another one"
     (is (= :empty-scan
            (error-of #(registry/resolve-driver
-                       {:scan '[uno.michelada.quint-connect.fixtures.bank]
+                       {:scan [(fixture :bank)]
                         :key-ns 'acme.mbt})))))
   (testing "and the scan follows :key-ns when the annotations do"
     (is (contains? (:actions (registry/resolve-driver
-                              {:scan '[uno.michelada.quint-connect.fixtures.keyed]
+                              {:scan [(fixture :keyed)]
                                :key-ns 'acme.mbt}))
                    "deposit"))))
 
 (deftest registry-is-rebuilt-every-call
-  (let [a (registry/resolve-driver {:scan '[uno.michelada.quint-connect.fixtures.bank]})
-        b (registry/resolve-driver {:scan '[uno.michelada.quint-connect.fixtures.bank]})]
+  (let [a (registry/resolve-driver {:scan [(fixture :bank)]})
+        b (registry/resolve-driver {:scan [(fixture :bank)]})]
     (is (not (identical? (:actions a) (:actions b))))))

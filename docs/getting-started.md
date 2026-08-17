@@ -67,7 +67,8 @@ quint run spec/counter.qnt --max-steps=4 --verbosity=0
 
  :aliases
  {:test {:extra-paths ["test"]
-         :extra-deps  {uno.michelada/quint-connect {:local/root "../quint-connect-clj"}
+         :extra-deps  {org.clojars.aldebogdanov/quint-connect
+                       {:local/root "../quint-connect-clj"}
 
                        io.github.cognitect-labs/test-runner
                        {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
@@ -129,8 +130,8 @@ The third form is why `:empty-scan` exists and why its message names this.
 (ns myapp.model-test
   (:require [clojure.test :refer [deftest]]
             [myapp.core]
-            [uno.michelada.quint-connect.core :as q]
-            [uno.michelada.quint-connect.test :as qt]))
+            [org.clojars.aldebogdanov.quint-connect.core :as q]
+            [org.clojars.aldebogdanov.quint-connect.test :as qt]))
 
 (q/defdriver counter
   {:spec "spec/counter.qnt"

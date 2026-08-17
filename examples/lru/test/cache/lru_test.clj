@@ -1,8 +1,8 @@
 (ns cache.lru-test
   (:require [clojure.test :refer [deftest]]
             [cache.lru]
-            [uno.michelada.quint-connect.core :as q]
-            [uno.michelada.quint-connect.test :as qt]))
+            [org.clojars.aldebogdanov.quint-connect.core :as q]
+            [org.clojars.aldebogdanov.quint-connect.test :as qt]))
 
 (q/defdriver cache
   {:spec "spec/lru.qnt"

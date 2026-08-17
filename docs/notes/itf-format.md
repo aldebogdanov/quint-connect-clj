@@ -151,7 +151,7 @@ Its contents are logs, not results: `_apalache-out/server/<timestamp>/` holding
 `log0.smt`, `detailed.log` and `run.txt`.
 
 **The dialect needs nothing from the decoder.** A recorded counterexample
-decodes through `uno.michelada.quint-connect.itf` unchanged: `#meta` carries
+decodes through `itf` unchanged: `#meta` carries
 `format`, `varTypes`, `format-description` and `description`, so `:source`
 comes out nil and `varTypes` is ignored along with the rest of `#meta`. Values
 are plain `#bigint` and records. **No `#unserializable`** — so it stays

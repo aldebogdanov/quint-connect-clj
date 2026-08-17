@@ -1,4 +1,4 @@
-(ns uno.michelada.quint-connect.fixtures.bank
+(ns org.clojars.aldebogdanov.quint-connect.fixtures.bank
   "An annotated toy bank. Deliberately written the way application code would
   be: no require of quint-connect, handlers taking their own arguments.")
 

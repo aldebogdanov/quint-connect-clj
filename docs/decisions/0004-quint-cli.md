@@ -17,7 +17,7 @@ Shelling out means we inherit every Quint improvement for free and stay
 uninvolved in its evolution.
 
 JSON parsing: `data.json` is pure Clojure with no transitive dependencies, and
-it is hidden behind one function in `uno.michelada.quint-connect.itf`, so swapping it is a
+it is hidden behind one function in `itf`, so swapping it is a
 one-line change. No Cheshire, no Jackson, no transit — a testing library that
 drags a JSON stack into a user's dependency tree is a bad neighbour.
 
@@ -32,7 +32,7 @@ Developed and tested against **Quint 0.32.0**. The CLI surface we depend on:
 - `quint test --match --out-itf` (no `--mbt` support; see notes/itf-format.md)
 - `quint verify --invariant --out-itf`
 
-`uno.michelada.quint-connect.quint` checks `quint --version` once per process and warns — not
+`quint` checks `quint --version` once per process and warns — not
 fails — on a different version. Fixtures in `dev/fixtures/` record what 0.32.0
 actually produced, so a format change shows up as a failing decode test rather
 than a confusing runtime error.

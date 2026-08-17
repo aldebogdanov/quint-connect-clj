@@ -9,8 +9,8 @@ composable ones?
 
 ## Decision
 
-Two. `uno.michelada.quint-connect.quint` produces ITF files. `uno.michelada.quint-connect.itf` +
-`uno.michelada.quint-connect.replay` consume decoded traces and are completely pure. `q/check`
+Two. `quint` produces ITF files. `itf` +
+`replay` consume decoded traces and are completely pure. `q/check`
 is the small function that composes them.
 
 ## Why

@@ -21,7 +21,8 @@ The rules below exist to keep that possible. They outrank habit, convention and
 ## Code
 
 Namespaces are written below by their last segment; all live under
-`uno.michelada.quint-connect.*` (Clojars: `uno.michelada/quint-connect`).
+`org.clojars.aldebogdanov.quint-connect.*`
+(Clojars: `org.clojars.aldebogdanov/quint-connect`).
 
 - **Data in, data out.** Public functions take a map and return a map.
   Side effects live in `quint` and `test` only.

@@ -1,9 +1,9 @@
-(ns uno.michelada.quint-connect.replay-test
+(ns org.clojars.aldebogdanov.quint-connect.replay-test
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
-            [uno.michelada.quint-connect.itf :as itf]
-            [uno.michelada.quint-connect.replay :as replay]
-            [uno.michelada.quint-connect.report :as report]))
+            [org.clojars.aldebogdanov.quint-connect.itf :as itf]
+            [org.clojars.aldebogdanov.quint-connect.replay :as replay]
+            [org.clojars.aldebogdanov.quint-connect.report :as report]))
 
 ;; --- a toy bank, standing in for an application ---------------------------
 

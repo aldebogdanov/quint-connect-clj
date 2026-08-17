@@ -14,7 +14,7 @@ No library code.
 
 ---
 
-## M1 — `uno.michelada.quint-connect.itf`: decode (done)
+## M1 — `itf`: decode (done)
 
 Pure ITF JSON -> EDN.
 
@@ -41,7 +41,7 @@ description) is ignored.
 
 ---
 
-## M2 — `uno.michelada.quint-connect.replay` + `uno.michelada.quint-connect.report`: the loop (done)
+## M2 — `replay` + `report`: the loop (done)
 
 No subprocess, no file I/O, no metadata — this milestone consumes a resolved
 driver map that the tests build by hand. The only effects are the ones the
@@ -66,7 +66,7 @@ the second trace.
 
 ---
 
-## M3 — `uno.michelada.quint-connect.registry`: the annotations (done)
+## M3 — `registry`: the annotations (done)
 
 The reflective layer, and the reason the project has the shape it has. It turns
 `:quint/*` metadata into the driver map M2 already consumes.
@@ -95,7 +95,7 @@ metadata trap produces a message that names it.
 
 ---
 
-## M4 — `uno.michelada.quint-connect.quint`: talk to the CLI (done)
+## M4 — `quint`: talk to the CLI (done)
 
 - Build the command for `run` (`--mbt --seed --n-traces --max-samples
   --max-steps --out-itf --verbosity 0`), run it in a temp dir with
@@ -111,7 +111,7 @@ typed error carrying Quint's own stderr verbatim.
 
 ---
 
-## M5 — `uno.michelada.quint-connect.core` + `uno.michelada.quint-connect.test`: usable (done)
+## M5 — `core` + `test`: usable (done)
 
 - `q/driver`, `q/defdriver`, `q/check`, `q/replay-file`, plus the `clojure.test`
   bridge that turns a result map into one assertion with a good message.
@@ -198,7 +198,7 @@ counterexample that replays against the implementation.
 Candidates, in rough priority order. Each needs its own justification when its
 turn comes; none is committed to now.
 
-- `uno.michelada.quint-connect.cli` — generate and cache traces into `test-resources/`, so CI can
+- `cli` — generate and cache traces into `test-resources/`, so CI can
   run without Quint. It brings its own `deps.edn` alias; there is deliberately
   no alias pointing at a namespace that does not exist yet.
 - `:setup` / `:teardown` in the driver map, run once per `check`. Only if

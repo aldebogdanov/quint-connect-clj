@@ -1,4 +1,4 @@
-(ns uno.michelada.quint-connect.fixtures.keyed
+(ns org.clojars.aldebogdanov.quint-connect.fixtures.keyed
   "The same annotations under a driver-supplied :key-ns.")
 
 (def ^{:acme.mbt/state :balances} accounts (atom {}))

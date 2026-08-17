@@ -29,7 +29,8 @@ no return-value convention, no require. This is the Clojure counterpart of
 ## Coordinates
 
 ```clojure
-uno.michelada/quint-connect {:mvn/version "…"}    ; Clojars, not released yet
+;; Clojars, not released yet
+org.clojars.aldebogdanov/quint-connect {:mvn/version "…"}
 ```
 
 ## Usage
@@ -64,8 +65,8 @@ none of its own:
 (ns bank.model-test
   (:require [bank.core :as bank]
             [clojure.test :refer [deftest]]
-            [uno.michelada.quint-connect.core :as q]           ; the API
-            [uno.michelada.quint-connect.test :as qt]))        ; the clojure.test bridge
+            [org.clojars.aldebogdanov.quint-connect.core :as q]    ; the API
+            [org.clojars.aldebogdanov.quint-connect.test :as qt])) ; the bridge
 
 (defn last-error                             ; called with no arguments
   {:quint/state :lastError}
@@ -173,8 +174,8 @@ nobody writes by hand. `cd examples/lru && clojure -M:test`.
 ## Repository layout
 
 ```
-src/uno/michelada/quint_connect/     library code (.clj)
-test/uno/michelada/quint_connect/    tests
+src/org/clojars/aldebogdanov/quint_connect/     library code (.clj)
+test/org/clojars/aldebogdanov/quint_connect/    tests
 test-resources/quint-connect/        traces promoted from a failing run
 examples/lru/                        runnable example: an LRU cache
 dev/bank/                            annotated toy implementation of bank.qnt

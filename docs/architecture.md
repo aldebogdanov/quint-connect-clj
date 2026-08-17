@@ -26,7 +26,7 @@ Everything else — the Quint CLI, ITF decoding, metadata scanning,
 ## 2. Pipeline
 
 Namespaces are shown by their last segment; all live under
-`uno.michelada.quint-connect.*`.
+`org.clojars.aldebogdanov.quint-connect.*`.
 
 ```
  spec.qnt
@@ -56,8 +56,8 @@ See [decisions/0003-two-phase.md](decisions/0003-two-phase.md).
 
 ## 3. Namespaces
 
-All under `uno.michelada.quint-connect`, the Clojars group and artifact
-(`uno.michelada/quint-connect`).
+All under `org.clojars.aldebogdanov.quint-connect`, matching the Clojars group
+and artifact (`org.clojars.aldebogdanov/quint-connect`).
 
 | namespace                 | kind       | responsibility                                                                                                                    |
 | ------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
@@ -273,7 +273,7 @@ possible without touching it.
 Resolution, in order: `require` each `:scan` namespace -> read `ns-interns`
 metadata -> assemble actions, readers and lifecycle -> merge the driver map on
 top -> validate. The merged result is the **resolved driver**, an ordinary map
-of data and functions, and it is what `uno.michelada.quint-connect.replay` consumes. Nothing
+of data and functions, and it is what `replay` consumes. Nothing
 downstream of the registry knows that metadata exists.
 
 `(q/driver m)` is a function returning the resolved driver; `q/defdriver` is
@@ -348,7 +348,7 @@ The failing trace travels as JSON rather than as a filename because the
 scratch directory Quint wrote it to is deleted before `check` returns.
 `:saved` is where it landed afterwards — see §7.
 
-Result data is the contract. `uno.michelada.quint-connect.report` and `uno.michelada.quint-connect.test` are
+Result data is the contract. `report` and `test` are
 consumers of it, not producers of parallel truth. Carrying the handler and
 reader *vars* is the payoff of the annotation design: a failure points at the
 file and line of the function that diverged and at the one that observed it.
@@ -397,7 +397,7 @@ Two properties make this a workflow rather than a pile of files:
   `mv` a human performs. A failing test never dirties the repository, and a
   committed trace is always one someone chose to keep.
 
-Writing the file is the only reason `uno.michelada.quint-connect.test` touches
+Writing the file is the only reason `test` touches
 the filesystem, and it is why the step lives there rather than in `core`:
 `q/check` stays a function of data returning data.
 
@@ -407,7 +407,7 @@ JVM only, and the design spends that freely rather than pretending otherwise:
 
 - `ns-interns` + `meta` for the registry — reflection over vars, nothing deeper.
 - `clojure.java.process/exec` (Clojure 1.12, no dependency) for running `quint`.
-- `clojure.data.json` for parsing, behind one function in `uno.michelada.quint-connect.itf`.
+- `clojure.data.json` for parsing, behind one function in `itf`.
 - `clojure.data/diff` for diffing.
 - `java.nio.file.Files/createTempDirectory` for trace scratch space.
 - Files are `.clj`. No reader conditionals anywhere.

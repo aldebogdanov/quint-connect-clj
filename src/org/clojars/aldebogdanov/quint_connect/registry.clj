@@ -1,4 +1,4 @@
-(ns uno.michelada.quint-connect.registry
+(ns org.clojars.aldebogdanov.quint-connect.registry
   "Turn `:quint/*` metadata into the resolved driver replay consumes. The only
   namespace that reflects, and only over the explicit `:scan` list. Rebuilt on
   every call: no global registry, nothing cached between runs."

@@ -39,7 +39,7 @@ rather than leaving it implicit.
 - No model-based testing of ClojureScript front ends.
 - If that is ever wanted, it cannot be a port of this design — it would need
   explicit registration instead of scanning. What *would* carry over is the pure
-  half: `uno.michelada.quint-connect.itf`, `uno.michelada.quint-connect.replay` and `uno.michelada.quint-connect.report` consume a
+  half: `itf`, `replay` and `report` consume a
   plain driver map, know nothing about metadata, and use no JVM interop. That
   separation is deliberate insurance, not a promise.
 

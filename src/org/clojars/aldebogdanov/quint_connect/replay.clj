@@ -1,4 +1,4 @@
-(ns uno.michelada.quint-connect.replay
+(ns org.clojars.aldebogdanov.quint-connect.replay
   "Run one decoded trace against a resolved driver. No I/O of its own: the only
   effects are the ones the driver's own functions perform."
   (:require [clojure.data :as data]))

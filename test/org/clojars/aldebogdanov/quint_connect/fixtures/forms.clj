@@ -1,4 +1,4 @@
-(ns uno.michelada.quint-connect.fixtures.forms
+(ns org.clojars.aldebogdanov.quint-connect.fixtures.forms
   "The remaining annotation forms: a nested read, a whole-state reader, halt,
   and a private var.")
 

@@ -1,9 +1,9 @@
-(ns uno.michelada.quint-connect.core
+(ns org.clojars.aldebogdanov.quint-connect.core
   "The public API: build a driver, then check an implementation against a spec."
-  (:require [uno.michelada.quint-connect.itf :as itf]
-            [uno.michelada.quint-connect.quint :as quint]
-            [uno.michelada.quint-connect.registry :as registry]
-            [uno.michelada.quint-connect.replay :as replay]))
+  (:require [org.clojars.aldebogdanov.quint-connect.itf :as itf]
+            [org.clojars.aldebogdanov.quint-connect.quint :as quint]
+            [org.clojars.aldebogdanov.quint-connect.registry :as registry]
+            [org.clojars.aldebogdanov.quint-connect.replay :as replay]))
 
 (defn driver
   "Resolve a driver map into the driver `check` and `replay-file` consume.

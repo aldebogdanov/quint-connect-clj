@@ -1,4 +1,4 @@
-(ns uno.michelada.quint-connect.itf
+(ns org.clojars.aldebogdanov.quint-connect.itf
   "Decode Quint's ITF trace files into EDN. Pure: no file or process I/O.
   What Quint emits, and why parts of it are odd, is in docs/notes/itf-format.md."
   (:require [clojure.data.json :as json]

@@ -1,4 +1,4 @@
-(ns uno.michelada.quint-connect.quint
+(ns org.clojars.aldebogdanov.quint-connect.quint
   "Run the Quint CLI and collect the ITF files it writes. The only namespace
   that shells out."
   (:refer-clojure :exclude [run!])

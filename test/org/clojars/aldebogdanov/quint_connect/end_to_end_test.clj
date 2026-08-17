@@ -1,13 +1,13 @@
-(ns uno.michelada.quint-connect.end-to-end-test
+(ns org.clojars.aldebogdanov.quint-connect.end-to-end-test
   "The whole thing: a Quint spec, an annotated implementation, and a real
    deftest. Needs quint on PATH."
   (:require [bank.core :as bank]
             [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.test :as t :refer [deftest is testing]]
-            [uno.michelada.quint-connect.core :as q]
-            [uno.michelada.quint-connect.report :as report]
-            [uno.michelada.quint-connect.test :as qt])
+            [org.clojars.aldebogdanov.quint-connect.core :as q]
+            [org.clojars.aldebogdanov.quint-connect.report :as report]
+            [org.clojars.aldebogdanov.quint-connect.test :as qt])
   (:import (java.nio.file Files)
            (java.nio.file.attribute FileAttribute)))
 
