@@ -173,11 +173,14 @@ unless the whole namespace scans empty. See
 
 ## Examples
 
-[examples/counter/](examples/counter/) is the
-[getting-started](docs/getting-started.md) tutorial as a runnable project —
-start there. [examples/lru/](examples/lru/) is a small LRU cache with a bug
-that only shows up after a particular interleaving of reads and writes, which
-is the kind of test nobody writes by hand.
+Four runnable projects, each teaching one thing. Start at the first.
+
+| example | what it shows |
+| ------- | ------------- |
+| [counter/](examples/counter/) | the [getting-started](docs/getting-started.md) tutorial, as a project rather than a page |
+| [lru/](examples/lru/) | a cache bug that only appears after a particular interleaving — the test nobody writes by hand |
+| [tokens/](examples/tokens/) | `verify`: sampling versus proving, and why a green `verify` does not mean your code is right |
+| [queue/](examples/queue/) | `:quint/driver`: one implementation and one spec file, two drivers with different setup |
 
 ```bash
 cd examples/counter && clojure -M:test
@@ -199,7 +202,9 @@ src/org/clojars/aldebogdanov/quint_connect/   library code (.clj)
 test/org/clojars/aldebogdanov/quint_connect/  tests
 test-resources/quint-connect/  traces promoted from a failing run
 examples/counter/              the getting-started tutorial, runnable
-examples/lru/                  runnable example: an LRU cache
+examples/lru/                  a bug found only by interleaving
+examples/tokens/               verify: an invariant proved, and one broken
+examples/queue/                two drivers over one namespace
 dev/bank/                      annotated toy implementation of bank.qnt
 dev/fixtures/                  example Quint spec + recorded ITF traces
 dev/probes/                    scripts that verified the claims in the docs

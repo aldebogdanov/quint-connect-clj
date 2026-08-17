@@ -73,6 +73,9 @@ jobs:
 
       - run: cd examples/counter && clojure -M:test
       - run: cd examples/lru && clojure -M:test
+      - run: cd examples/queue && clojure -M:test
+      # tokens has ^:slow verify tests; -e :slow keeps Apalache out of CI.
+      - run: cd examples/tokens && clojure -M:test -e :slow
 
   # Apalache: downloaded on first use and minutes per run, so it is not on the
   # path of an ordinary pull request. Run it by hand before a release.
