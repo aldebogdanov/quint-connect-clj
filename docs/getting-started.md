@@ -3,6 +3,11 @@
 From an empty directory to a model-based test that finds a real bug. Every
 command below was run against Quint 0.32.0 and Clojure 1.12.5.
 
+§1–§5 exist as a project you can run instead of retype:
+[`examples/counter/`](../examples/counter/) is this same spec and the same
+implementation, so if the tutorial stops working, running it is how anyone
+finds out.
+
 ## What you need
 
 - **Clojure** with the `clojure` CLI.

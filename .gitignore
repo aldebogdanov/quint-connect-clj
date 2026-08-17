@@ -10,4 +10,4 @@ node_modules/
 *.log
 
 # Traces written by failing runs; promote them to test-resources/ deliberately.
-test-resources/quint-connect/failures/
+**/test-resources/quint-connect/failures/

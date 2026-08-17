@@ -156,11 +156,17 @@ and leave an annotation on `:quint/*`, nothing reads it and nothing warns you,
 unless the whole namespace scans empty. See
 [docs/decisions/0007-annotation-keys.md](docs/decisions/0007-annotation-keys.md).
 
-## Example
+## Examples
 
-[examples/lru/](examples/lru/) is a small LRU cache with a bug that only shows
-up after a particular interleaving of reads and writes — the kind of test
-nobody writes by hand. `cd examples/lru && clojure -M:test`.
+[examples/counter/](examples/counter/) is the
+[getting-started](docs/getting-started.md) tutorial as a runnable project —
+start there. [examples/lru/](examples/lru/) is a small LRU cache with a bug
+that only shows up after a particular interleaving of reads and writes, which
+is the kind of test nobody writes by hand.
+
+```bash
+cd examples/counter && clojure -M:test
+```
 
 ## Requirements
 
@@ -174,18 +180,19 @@ nobody writes by hand. `cd examples/lru && clojure -M:test`.
 ## Repository layout
 
 ```
-src/org/clojars/aldebogdanov/quint_connect/     library code (.clj)
-test/org/clojars/aldebogdanov/quint_connect/    tests
-test-resources/quint-connect/        traces promoted from a failing run
-examples/lru/                        runnable example: an LRU cache
-dev/bank/                            annotated toy implementation of bank.qnt
-dev/fixtures/                        example Quint spec + recorded ITF traces
-dev/probes/                          scripts that verified the claims in the docs
+src/org/clojars/aldebogdanov/quint_connect/   library code (.clj)
+test/org/clojars/aldebogdanov/quint_connect/  tests
+test-resources/quint-connect/  traces promoted from a failing run
+examples/counter/              the getting-started tutorial, runnable
+examples/lru/                  runnable example: an LRU cache
+dev/bank/                      annotated toy implementation of bank.qnt
+dev/fixtures/                  example Quint spec + recorded ITF traces
+dev/probes/                    scripts that verified the claims in the docs
 docs/architecture.md
 docs/roadmap.md
-docs/decisions/                      ADRs — why the design is what it is
-docs/notes/                          observed behaviour of Quint and of var metadata
-CLAUDE.md                            working agreement for AI-assisted changes
+docs/decisions/                ADRs — why the design is what it is
+docs/notes/                    observed behaviour of Quint and of var metadata
+CLAUDE.md                      working agreement for AI-assisted changes
 ```
 
 ## Contributing
