@@ -7,8 +7,12 @@
 #   3. whether Apalache's ITF dialect needs anything new from the decoder
 #
 # Findings are written up in docs/notes/itf-format.md §`quint verify`. Run this
-# to check they still hold on a new Quint or a new Apalache. Needs quint on
-# PATH; Apalache is downloaded on first use (~2 minutes, once).
+# to check they still hold on a new Quint or a new Apalache.
+#
+# Needs bash, `quint` on PATH, and python3 for the last section, which reads
+# the recorded counterexample back. Apalache is downloaded on first use
+# (~2 minutes, once). Nothing here touches the repository: it works in a
+# temporary directory and deletes it on exit.
 #
 # Usage: dev/probes/verify_probe.sh
 

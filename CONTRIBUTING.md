@@ -12,12 +12,27 @@ the cost of legibility will be turned down even when it is correct.
 ## Getting set up
 
 ```
-bb test        # 60 tests, needs nothing but Clojure
-bb test:all    # everything, needs quint on PATH
+bb test        # replay only
+bb test:all    # everything except the Apalache tests
+bb test:verify # the Apalache tests, minutes
 ```
 
-`bb test` runs entirely on committed traces in `dev/fixtures/`. If it fails on
-a fresh clone, that is a bug — please report it.
+The `bb` tasks are [babashka](https://babashka.org/), which is a convenience
+and not a requirement — each one is a single `clojure` invocation, and running
+them directly needs nothing but the `clojure` CLI:
+
+```
+clojure -M:test -e :integration -e :slow    # what `bb test` runs
+clojure -M:test -e :slow                    # `bb test:all`
+clojure -M:test -i :slow                    # `bb test:verify`
+```
+
+`bb test` is the one that must keep working on a bare machine: it runs entirely
+on committed traces in `dev/fixtures/` and touches no external tool. If it
+fails on a fresh clone with only Clojure installed, that is a bug — please
+report it.
+
+No test count is written here on purpose. It has been wrong twice.
 
 `bb test:all` additionally shells out to the real `quint`
 (`npm i -g @informalsystems/quint`). Those tests are tagged `^:integration`.

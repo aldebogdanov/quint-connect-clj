@@ -194,6 +194,9 @@ cd examples/counter && clojure -M:test
   *generation* (developed against 0.32.0). Trace *replay* needs nothing but
   Clojure — cached ITF files run in CI without Quint installed.
 - Apalache (fetched by `quint verify`) only for the verification mode.
+- [babashka](https://babashka.org/) only to use this repository's `bb` tasks,
+  which are shorthand for `clojure` commands and are not needed to consume the
+  library.
 
 ## Repository layout
 
@@ -217,8 +220,13 @@ CLAUDE.md                      working agreement for AI-assisted changes
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). `bb test` needs nothing but Clojure;
-`bb test:all` additionally needs `quint` on `PATH`.
+See [CONTRIBUTING.md](CONTRIBUTING.md). The test suite that replays committed
+traces needs nothing but the `clojure` CLI; the rest additionally needs `quint`
+on `PATH`, and the `verify` tests need Apalache, which `quint` fetches.
+
+The `bb` tasks in this repository are [babashka](https://babashka.org/)
+shorthand for single `clojure` commands, and CONTRIBUTING gives the long forms
+for anyone who would rather not install it.
 
 ## License
 
