@@ -25,7 +25,11 @@ test, and a scripted Quint `run` drives the implementation too.
   the driver. Supports `:quint/action`, `:quint/args`, `:quint/state` (on vars,
   on reference objects, on getters, with `:path`, and `:*`), `:quint/init` and
   `:quint/halt`. Validates `:empty-scan`, `:duplicate-action`,
-  `:duplicate-state` and `:ambiguous-arity` at construction.
+  `:duplicate-state`, `:duplicate-init`, `:duplicate-halt` and
+  `:ambiguous-arity` at construction. Two vars claiming the same lifecycle role
+  — in one namespace or across the `:scan` — are an error rather than
+  first-one-wins, because the loser would never run and an `init` that never
+  runs reappears as a divergence somewhere unrelated.
 - `quint` — run the Quint CLI in a scratch directory and collect the ITF files.
 - `core` + `test` — `driver`, `defdriver`, `check`, `replay-file`, and the
   `clojure.test` bridge.
@@ -53,9 +57,14 @@ test, and a scripted Quint `run` drives the implementation too.
 ### Known gaps
 
 - `:missing-state` is not implemented. A spec variable that no reader supplies
-  shows up as a diff against `{}` rather than a typed error.
-- Only `quint run --mbt` carries action metadata; `quint test` and
-  `quint verify` traces cannot drive an implementation yet.
+  shows up as a diff against nothing rather than a typed error. The driver
+  never sees the spec, so this can only be caught at the first comparison.
+- `quint verify` is not wired up. Its traces carry no `mbt::` variables, so
+  they will drive an implementation the same way `quint test` traces already
+  do — through `:action-path` — but the mode itself is M7b.
 - An annotation stranded under the wrong `:key-ns` is ignored silently unless
   the whole namespace scans empty. See
   [0007](docs/decisions/0007-annotation-keys.md).
+- No `:setup`/`:teardown` hook, and none is planned until something needs one:
+  a fixture that must run once per `check` is `clojure.test/use-fixtures` or a
+  `let` around the call.

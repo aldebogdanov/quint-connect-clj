@@ -48,7 +48,16 @@
       {:fn raw :var v :supplies :*}
       {:fn (fn [] {var-name (value)}) :var v :supplies var-name})))
 
-(defn- scan-ns [key-ns ns-sym]
+(defn- lifecycle
+  "An `init` or `halt` entry as replay wants it: called with no arguments."
+  [v]
+  {:fn (fn [] ((deref v))) :var v})
+
+(defn- scan-ns
+  "Everything one namespace declares, as four vectors. `:inits` and `:halts`
+  are vectors rather than single entries so that two vars claiming the same
+  lifecycle role can be counted and rejected, here or across the scan."
+  [key-ns ns-sym]
   (require ns-sym)
   (let [[ka kg ks ki kh] (map #(annotation-key key-ns %) [:action :args :state :init :halt])
         found (reduce
@@ -57,18 +66,17 @@
                    (cond-> acc
                      (contains? m ka) (update :actions conj [(get m ka) (action-handler v m kg)])
                      (contains? m ks) (update :readers conj (reader v (get m ks)))
-                     (get m ki)       (assoc :init {:fn (fn [] ((deref v))) :var v})
-                     (get m kh)       (assoc :halt {:fn (fn [] ((deref v))) :var v}))))
-               {:actions [] :readers []}
+                     (get m ki)       (update :inits conj (lifecycle v))
+                     (get m kh)       (update :halts conj (lifecycle v)))))
+               {:actions [] :readers [] :inits [] :halts []}
                (ns-interns ns-sym))]
-    (when (= {:actions [] :readers []} (select-keys found [:actions :readers]))
-      (when-not (or (:init found) (:halt found))
-        (fail :empty-scan
-              (str ns-sym " is in :scan but carries no " key-ns "/* annotations."
-                   " The usual cause is metadata on the (defn ...) form, which"
-                   " Clojure discards: write (defn ^{...} name ...) or"
-                   " (defn name {...} ...) instead.")
-              {:ns ns-sym :key-ns key-ns})))
+    (when (every? empty? (vals found))
+      (fail :empty-scan
+            (str ns-sym " is in :scan but carries no " key-ns "/* annotations."
+                 " The usual cause is metadata on the (defn ...) form, which"
+                 " Clojure discards: write (defn ^{...} name ...) or"
+                 " (defn name {...} ...) instead.")
+            {:ns ns-sym :key-ns key-ns}))
     found))
 
 (defn- no-duplicates! [error what pairs]
@@ -78,6 +86,21 @@
           (str "two vars claim the same " what " " (pr-str k) ": "
                (str/join ", " (sort (map #(str (:var (second %))) group))))
           {:name k :vars (mapv #(:var (second %)) group)})))
+
+(defn- only
+  "The single lifecycle annotation of its kind in the whole scan, or nil.
+
+  Two of them is an error rather than first-one-wins. The loser would simply
+  never run, and an `init` that never runs is the worst shape a failure can
+  take here: it surfaces as a divergence in some later trace, at a step that
+  has nothing to do with the var that was skipped."
+  [error k found]
+  (when (< 1 (count found))
+    (fail error
+          (str "two vars claim " k ": "
+               (str/join ", " (sort (map #(str (:var %)) found))))
+          {:name k :vars (mapv :var found)}))
+  (first found))
 
 (defn- normalize-actions
   "Driver-map actions are bare functions of the picks map and win over the scan."
@@ -96,11 +119,12 @@
 
   Returns the map `replay/run-trace` consumes — `:actions`, `:readers`,
   `:init`, `:halt`, `:ignore`, `:compare` — with the remaining keys of the
-  driver map (`:spec`, `:main`, `:init-action`, `:step-action`, `:setup`,
-  `:teardown`, …) passed through untouched for the caller.
+  driver map (`:spec`, `:main`, `:init-action`, `:step-action`, `:action-path`,
+  `:nondet-path`, `:key-fn`, …) passed through untouched for the caller.
 
   Throws `ex-info` with `:quint/error` `:empty-scan`, `:duplicate-action`,
-  `:duplicate-state` or `:ambiguous-arity`."
+  `:duplicate-state`, `:duplicate-init`, `:duplicate-halt` or
+  `:ambiguous-arity`."
   [{:keys [scan key-ns actions state] :or {key-ns 'quint} :as m}]
   (let [scanned    (map #(scan-ns key-ns %) scan)
         act-pairs  (mapcat :actions scanned)
@@ -109,10 +133,12 @@
     (no-duplicates! :duplicate-action "action" act-pairs)
     (no-duplicates! :duplicate-state "state variable"
                     (keep (fn [r] (when (not= :* (:supplies r)) [(:supplies r) r])) readers))
-    (-> (dissoc m :scan :state)
-        (assoc :actions (merge (into {} act-pairs) (normalize-actions actions))
-               :readers (into (vec (remove #(contains? overridden (:supplies %)) readers))
-                              (normalize-state state))
-               :key-ns  key-ns)
-        (cond-> (some :init scanned) (assoc :init (some :init scanned))
-                (some :halt scanned) (assoc :halt (some :halt scanned))))))
+    (let [init (only :duplicate-init (annotation-key key-ns :init) (mapcat :inits scanned))
+          halt (only :duplicate-halt (annotation-key key-ns :halt) (mapcat :halts scanned))]
+      (-> (dissoc m :scan :state)
+          (assoc :actions (merge (into {} act-pairs) (normalize-actions actions))
+                 :readers (into (vec (remove #(contains? overridden (:supplies %)) readers))
+                                (normalize-state state))
+                 :key-ns  key-ns)
+          (cond-> init (assoc :init init)
+                  halt (assoc :halt halt))))))

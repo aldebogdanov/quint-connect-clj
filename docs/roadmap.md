@@ -82,9 +82,11 @@ The reflective layer, and the reason the project has the shape it has. It turns
   map of spec variables.
 - `:quint/init` / `:quint/halt` -> the per-trace lifecycle.
 - Merge the driver map over the scan result; the map wins.
-- Validate loudly: `:empty-scan` (naming the `^{...} (defn ...)` trap),
-  `:duplicate-action`, `:duplicate-state`, `:ambiguous-arity`,
-  `:missing-state`, `:no-init`.
+- Validate loudly, at construction: `:empty-scan` (naming the
+  `^{...} (defn ...)` trap), `:duplicate-action`, `:duplicate-state`,
+  `:ambiguous-arity`. `:no-init` needs the trace and so belongs to replay;
+  `:missing-state` needs the spec's variable list, which the driver never sees,
+  and is not built — see [architecture.md](architecture.md) §5.
 - Rebuild on every call. No global registry atom, ever.
 
 **Done when:** a fixture namespace with every annotation form resolves to the
@@ -191,7 +193,13 @@ Candidates, in rough priority order. Each needs its own justification when its
 turn comes; none is committed to now.
 
 - `uno.michelada.quint-connect.cli` — generate and cache traces into `test-resources/`, so CI can
-  run without Quint.
+  run without Quint. It brings its own `deps.edn` alias; there is deliberately
+  no alias pointing at a namespace that does not exist yet.
+- `:setup` / `:teardown` in the driver map, run once per `check`. Only if
+  something real needs it: `clojure.test/use-fixtures` and a `let` around the
+  call already cover the container-per-run case without new machinery.
+- `:missing-state` at the first comparison — name the spec variables that no
+  reader supplies, instead of diffing them against nothing.
 - Richer annotations, *only* where a real spec demanded them: `:quint/action`
   with a set of names, per-var `:quint/compare`, `:quint/ignore`.
 - Variant handling configurable per driver, or per variable: a `:variants`

@@ -73,6 +73,13 @@ All under `uno.michelada.quint-connect`, the Clojars group and artifact
 Eight namespaces, none of which application code ever loads. If one passes
 ~200 lines, that is a signal to stop and reconsider, not to split it reflexively.
 
+`itf` passed it in M7a and stands at 230. Accepted as it is: it is one decoder
+of one format, and the halves a split would produce have no separate meaning.
+The acceptance is conditional on it stopping there, and M7b is the test of that
+— Apalache's ITF dialect and `#unserializable` both land in this namespace. If
+they do not fit, the conversation is `itf` versus an `itf.apalache` beside it,
+not a reflex split of what is already there.
+
 There is deliberately no keys namespace. An earlier design had one, existing
 only to be aliased so that `:quint/action` would resolve to a fully-qualified
 key; [0007](decisions/0007-annotation-keys.md) removed it along with the
@@ -138,6 +145,12 @@ The return value is **ignored**. State is never inferred from what a handler
 gives back; it is read afterwards, from the declared readers. That is what lets
 an ordinary application function be annotated as-is.
 
+Every parameter is a pick name, including the ones the body ignores. `[_who
+_amount]` asks for picks called `:_who` and `:_amount`, which no spec emits, so
+both arrive as `nil`. That is exactly right for a handler that ignores them —
+and it is not a way to skip a pick the handler does need. Name the parameter
+after the pick, or give the real order in `:quint/args`.
+
 If the real function needs something that is not a pick — a connection, a system
 map, a component — write a one-line wrapper in the test namespace and annotate
 that. Nothing in the application changes.
@@ -182,15 +195,13 @@ cached view of the system, because a cached view is a lie waiting to happen.
 ### Lifecycle
 
 ```
-:setup                          once per check       (driver map, optional)
-  for each trace:
-    :quint/init            once per trace       start / reset the app
-    read state, compare to trace state 0
-    for each following state:
-      action handler with picks
-      read state, compare
-    :quint/halt            in a finally
-:teardown                       once per check       (driver map, optional)
+for each trace:
+  :quint/init            once per trace       start / reset the app
+  read state, compare to trace state 0
+  for each following state:
+    action handler with picks
+    read state, compare
+  :quint/halt            in a finally
 ```
 
 ```clojure
@@ -200,6 +211,12 @@ cached view of the system, because a cached view is a lie waiting to happen.
 (defn start {:quint/init true} [] (mount/start))
 (defn stop  {:quint/halt true} [] (mount/stop))
 ```
+
+There is no per-*check* hook. A fixture that must start once for the whole run
+— a container, a database — is `clojure.test`'s own `use-fixtures`, or a `let`
+around the call to `check`; both already exist and neither needs this library's
+help. A `:setup`/`:teardown` pair in the driver map is an M8 candidate and
+nothing more.
 
 Two properties fall out of this shape:
 
@@ -230,10 +247,6 @@ touch application code.
    ;; --- where the annotations are ---------------------------------------
    :scan     '[bank.core bank.system bank.model-test]   ; required'd, then read
    :key-ns   'quint                         ; qualifier for all five keys
-
-   ;; --- once per check ---------------------------------------------------
-   :setup    (fn [] (start-test-container!))
-   :teardown (fn [] (stop-test-container!))
 
    ;; --- complex cases: merged over whatever :scan found, and winning -----
    :actions  {"transfer" (fn [{:keys [from to amount]}] ...)}   ; picks map
@@ -272,12 +285,22 @@ downstream of the registry knows that metadata exists.
   the `^{...} (defn ...)` trap; the message says so.
 - `:duplicate-action`, `:duplicate-state` — two vars claim the same name and
   neither is overridden.
+- `:duplicate-init`, `:duplicate-halt` — two vars claim the same lifecycle
+  role, in one namespace or across the `:scan`. First-one-wins is not an
+  option here: the loser would never run, and an `init` that never runs
+  reappears as a divergence in a later trace that has nothing to do with it.
 - `:ambiguous-arity` — multi-arity var without `:quint/args`.
-- `:missing-state` — a spec variable no reader supplies.
-- `:no-init` — the trace starts with an action nothing is annotated for.
 
-At run time: `:unknown-action`, `:state-read-failed`, plus a coverage report
-of handlers the traces never exercised.
+At replay time, because each of these needs the trace: `:no-init` (it starts
+with an action nothing is annotated for), `:unknown-action`,
+`:anonymous-action`, `:state-read-failed`, plus a coverage report of handlers
+the traces never exercised.
+
+A spec variable that no reader supplies is **not** caught at construction. The
+driver never sees the spec, only the annotations, so the first trace is what
+reveals it — as a step-0 diff of that variable against nothing. Turning it into
+a `:missing-state` at construction would mean parsing the spec, which is a
+non-goal (§10); doing it at the first comparison instead is open, and unbuilt.
 
 ## 6. Data shapes
 
@@ -401,11 +424,16 @@ never a bare string or a bare `assert`:
 The keywords:
 
 ```clojure
-:quint-not-found  :quint-failed  :no-traces  :bad-itf  :anonymous-action
-:name-collision  :empty-scan  :duplicate-action  :duplicate-state
-:ambiguous-arity  :missing-state  :no-init  :unknown-action
-:state-read-failed
+:quint-not-found  :quint-failed  :no-traces  :test-failed  :bad-itf
+:bad-decode-path  :name-collision  :empty-scan  :duplicate-action
+:duplicate-state  :duplicate-init  :duplicate-halt  :ambiguous-arity
+:no-init  :unknown-action  :anonymous-action  :state-read-failed
+:save-failed
 ```
+
+That list is the whole set, and it is checked against the source rather than
+maintained by hand: `grep -rho '(fail :[a-z-]*' src/` plus the two passed to
+`registry/no-duplicates!`.
 
 A *state mismatch* is not an exception — it is a value in the result map.
 Exceptions are for broken setups; divergence is the expected output of a
@@ -432,6 +460,8 @@ testing tool.
 | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `^{...} (defn ...)` silently loses metadata                | `:empty-scan` error naming the trap; documented in three places                                            |
 | an annotation stranded under the wrong `:key-ns`           | **none** — caught only if the namespace scans empty; accepted in [0007](decisions/0007-annotation-keys.md) |
+| two scanned namespaces both annotating `:quint/init`       | `:duplicate-init` / `:duplicate-halt` at construction, naming both vars                                    |
+| a spec variable no reader supplies                         | diverges against nothing on the first state carrying it; there is no `:missing-state` — see §5             |
 | an `init` that does not fully reset leaks between traces   | state 0 is compared right after `init`; a leak fails immediately                                           |
 | `init` per trace is expensive for a full system start      | documented; prefer a cheap reset function over `mount/start`                                               |
 | ghost vars surviving a REPL reload                         | registry rebuilt per run; unused-handler coverage report                                                   |

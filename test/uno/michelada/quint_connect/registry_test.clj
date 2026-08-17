@@ -5,7 +5,8 @@
             [uno.michelada.quint-connect.registry :as registry]
             [uno.michelada.quint-connect.replay :as replay]
             [uno.michelada.quint-connect.fixtures.bank :as bank]
-            [uno.michelada.quint-connect.fixtures.forms :as forms]))
+            [uno.michelada.quint-connect.fixtures.forms :as forms]
+            [uno.michelada.quint-connect.fixtures.restart :as restart]))
 
 (defn- error-of [f]
   (try (f) nil (catch clojure.lang.ExceptionInfo e (:quint/error (ex-data e)))))
@@ -126,6 +127,39 @@
       (is (str/includes? (ex-message e) "from-an-atom"))
       (is (str/includes? (ex-message e) "from-a-getter")))
     (is (= 2 (count (:vars (ex-data e)))))))
+
+(deftest duplicate-init-is-rejected
+  ;; Two in one namespace: scan-ns used to keep whichever ns-interns yielded
+  ;; last, so the other reset simply never ran.
+  (let [e (try (registry/resolve-driver
+                {:scan '[uno.michelada.quint-connect.fixtures.duplicate-init]})
+               (catch clojure.lang.ExceptionInfo ex ex))]
+    (is (= :duplicate-init (:quint/error (ex-data e))))
+    (is (str/includes? (ex-message e) ":quint/init") "the message names the key")
+    (testing "and both vars, or it cannot be acted on"
+      (is (str/includes? (ex-message e) "open!"))
+      (is (str/includes? (ex-message e) "reopen!"))
+      (is (= 2 (count (:vars (ex-data e))))))))
+
+(deftest duplicate-lifecycle-across-namespaces-is-rejected
+  (testing "init, the collision a :scan list grows into"
+    (is (= :duplicate-init
+           (error-of #(registry/resolve-driver
+                       {:scan '[uno.michelada.quint-connect.fixtures.bank
+                                uno.michelada.quint-connect.fixtures.restart]})))))
+  (testing "halt, the same way"
+    (is (= :duplicate-halt
+           (error-of #(registry/resolve-driver
+                       {:scan '[uno.michelada.quint-connect.fixtures.forms
+                                uno.michelada.quint-connect.fixtures.restart]}))))))
+
+(deftest one-of-each-still-resolves
+  ;; The guard counts init and halt separately, so a namespace declaring both
+  ;; is the ordinary case and not a collision.
+  (let [d (registry/resolve-driver
+           {:scan '[uno.michelada.quint-connect.fixtures.restart]})]
+    (is (= #'restart/start! (get-in d [:init :var])))
+    (is (= #'restart/stop! (get-in d [:halt :var])))))
 
 (deftest duplicate-action-message-names-both-vars
   (let [e (try (registry/resolve-driver

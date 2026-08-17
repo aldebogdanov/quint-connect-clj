@@ -106,6 +106,9 @@ Two rules worth knowing up front:
 - Action handlers receive the `nondet` picks Quint made, bound **by parameter
   name**. Use `:quint/args` when your parameter names differ from the spec's.
 - The return value is ignored. State is read afterwards, through the readers.
+- A parameter the body ignores is still a pick name. `refuse`'s `[_n]` above
+  asks for a pick called `:_n`, which the spec never emits, so it arrives as
+  `nil` — fine here, and not a way to skip a pick you actually use.
 
 **The one syntax trap.** Metadata must sit on the symbol or in the attr-map,
 never on the `(defn ...)` form:
@@ -327,10 +330,15 @@ recorded failure a deterministic regression test — see §6.
 
 ## Rough edges, honestly
 
-- **Not released.** No Clojars artifact and no license yet.
+- **Not released.** No Clojars artifact yet; use `:local/root` or `:git/url`.
+  The license is [EPL-2.0](../LICENSE), the same as Clojure's.
 - **`:missing-state` is not implemented.** A spec variable that no reader
-  supplies shows up as a diff against `{}` rather than a clear error.
+  supplies shows up as a diff against nothing rather than a clear error. The
+  driver never reads the spec, so the first trace is what reveals it.
 - **`quint verify` is not wired up yet.** That is M7b. `quint test` is, through
   `check-run`, provided the spec records its own action — see §7.
 - **A stranded `:key-ns`** — annotations left under the old qualifier — is
   ignored silently unless the whole namespace scans empty.
+- **No `:setup`/`:teardown`.** Anything that must happen once per `check`, not
+  once per trace, goes in `clojure.test/use-fixtures` or a `let` around the
+  call.

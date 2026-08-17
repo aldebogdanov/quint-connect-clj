@@ -1,7 +1,10 @@
 (ns uno.michelada.quint-connect.quint-test
   "These shell out to the real quint. They are the only tests that need it
    installed; everything downstream runs on committed traces."
-  (:require [clojure.string :as str]
+  (:require [clojure.java.io :as io]
+            [clojure.java.process :as process]
+            [clojure.set :as set]
+            [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [uno.michelada.quint-connect.itf :as itf]
             [uno.michelada.quint-connect.quint :as quint]))
@@ -56,16 +59,16 @@
                                           :traces 3 :max-steps 3})))))))
 
 (deftest ^:integration temp-directories-are-cleaned
-  (let [before (set (.list (clojure.java.io/file (System/getProperty "java.io.tmpdir"))))]
+  (let [before (set (.list (io/file (System/getProperty "java.io.tmpdir"))))]
     (quint/run! {:spec spec :main "bankTest" :seed 3 :traces 1 :max-steps 3})
-    (let [after (set (.list (clojure.java.io/file (System/getProperty "java.io.tmpdir"))))]
+    (let [after (set (.list (io/file (System/getProperty "java.io.tmpdir"))))]
       (is (empty? (filter #(str/starts-with? % "quint-connect-")
-                          (clojure.set/difference after before)))))))
+                          (set/difference after before)))))))
 
 (deftest ^:integration missing-binary-is-typed
   (let [path (System/getenv "PATH")]
     (is (= :quint-not-found
-           (error-of #(with-redefs [clojure.java.process/start
+           (error-of #(with-redefs [process/start
                                     (fn [& _] (throw (java.io.IOException. "nope")))]
                         (quint/version))))
         (str "PATH was " path))))

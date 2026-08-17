@@ -12,7 +12,7 @@ the cost of legibility will be turned down even when it is correct.
 ## Getting set up
 
 ```
-bb test        # 41 tests, needs nothing but Clojure
+bb test        # 60 tests, needs nothing but Clojure
 bb test:all    # everything, needs quint on PATH
 ```
 

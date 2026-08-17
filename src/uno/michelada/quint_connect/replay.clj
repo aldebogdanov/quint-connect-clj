@@ -53,7 +53,9 @@
 (defn- mismatch
   "The diverging part of one comparison, or nil. Only the trace's own variables
   are compared: a reader supplying extra keys is not an error, while a spec
-  variable nothing supplies is `:missing-state` at driver construction."
+  variable nothing supplies diverges here against nothing, on the first state
+  that carries it. The driver never sees the spec, so that first comparison is
+  the earliest anything can know the variable exists."
   [{:keys [ignore] cmp :compare} expected actual]
   (let [diverged (remove (fn [k]
                            (or (contains? (or ignore #{}) k)
