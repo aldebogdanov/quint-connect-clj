@@ -391,6 +391,11 @@ recorded failure a deterministic regression test — see §6.
   driver never reads the spec, so the first trace is what reveals it.
 - **A stranded `:key-ns`** — annotations left under the old qualifier — is
   ignored silently unless the whole namespace scans empty.
+- **A misspelled `:quint/driver`** is the same shape of silence.
+  `{:quint/driver :ledgr}` is read by no driver and reported by none, because
+  nothing can tell it from an annotation scoped to a driver you are not
+  building right now. An `init` lost this way fails at step 0 of the first
+  trace, which is the cheapest place to notice it.
 - **No `:setup`/`:teardown`.** Anything that must happen once per `check`, not
   once per trace, goes in `clojure.test/use-fixtures` or a `let` around the
   call.

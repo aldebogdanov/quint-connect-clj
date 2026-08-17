@@ -57,10 +57,45 @@ common one, but it was reasoned about rather than met.
 
 That was raised twice and the key was asked for anyway. It is the author's
 call, and this paragraph is here so that the call is legible later rather than
-looking like the rule was forgotten. The specific risk taken: a scoping key is
-much harder to remove than to add, and if the first real multi-spec application
-wants scoping by *spec file* or by *module* rather than by driver name, this
-key will be the wrong shape and will already have users.
+looking like the rule was forgotten.
+
+## Why the driver, and not the spec
+
+The scope names a **driver**, and that is the only unit it could sensibly name.
+A driver map already carries `:spec`, so a driver is what selects a
+specification: scoping to `:ledger` scopes to whatever spec the `:ledger`
+driver runs, transitively and without saying it twice. Naming the spec file in
+the annotation would be a second, unchecked copy of something the driver map
+already states — the same "two sources of truth" this project rejects for
+dependencies in [0008](0008-release.md) and for types in
+[architecture §10](../architecture.md).
+
+It is also strictly less expressive. Two drivers can share one spec and want
+different lifecycle — `check` against a fixture database and `verify` against
+an in-memory one is the obvious case — and a spec-named scope could not tell
+them apart. A driver-named one can.
+
+## The risk actually taken
+
+Not the shape of the key; the silence around its values. Driver names are
+ad-hoc keywords that nothing validates, so a typo scopes an annotation to a
+driver that does not exist:
+
+```clojure
+(defn open-ledger! {:quint/init true :quint/driver :ledgr} [] ...)   ; typo
+```
+
+No driver named `:ledgr` is ever built, so that `init` is read by nobody, and
+nothing reports it. The registry cannot tell a typo from an annotation
+legitimately scoped to a driver that is not the one being built right now —
+they are the same observation.
+
+This is the same family as the stranded `:key-ns` in
+[0007](0007-annotation-keys.md) §"The gap this leaves", and it is accepted on
+the same terms: written down rather than closed with a
+name-similarity heuristic. What limits it is that `:quint/init` is the
+annotation most worth scoping and the one whose absence shows up immediately —
+a driver whose init never runs fails at step 0 of its first trace, with a diff.
 
 ## Alternatives, and why not
 

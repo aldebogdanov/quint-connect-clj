@@ -80,13 +80,11 @@ not: Apalache's dialect decodes through it unchanged, and `#unserializable`
 never appeared, so the namespace is untouched since M7a. That condition held
 and is now discharged.
 
-`quint` grew with `verify!` and is the one to watch. It is three commands
-against one CLI, sharing the version check, the scratch directory and the
-collection of ITF files, and the seam a split would follow — one namespace per
-subcommand — would triplicate all three. The honest reading is that it is over
-budget and that the fix is not obvious, so it is written down here instead of
-being performed. If a fourth subcommand arrives, that is the moment to reopen
-it rather than now.
+`quint` grew with `verify!` and is **accepted at 264 for now**, deliberately.
+It is three commands against one CLI, sharing the version check, the scratch
+directory and the collection of ITF files, and the seam a split would follow —
+one namespace per subcommand — would triplicate all three. A fourth subcommand
+is the moment to reopen it; until then the size is the lesser cost.
 
 There is deliberately no keys namespace. An earlier design had one, existing
 only to be aliased so that `:quint/action` would resolve to a fully-qualified
@@ -481,6 +479,7 @@ testing tool.
 | an annotation stranded under the wrong `:key-ns`           | **none** — caught only if the namespace scans empty; accepted in [0007](decisions/0007-annotation-keys.md) |
 | two scanned namespaces both annotating `:quint/init`       | `:duplicate-init` / `:duplicate-halt` at construction, naming both vars                                    |
 | a spec variable no reader supplies                         | diverges against nothing on the first state carrying it; there is no `:missing-state` — see §5             |
+| `:quint/driver` naming a driver that does not exist        | **none** — indistinguishable from scoping to a driver not being built; accepted in [0009](decisions/0009-driver-scope.md) |
 | an `init` that does not fully reset leaks between traces   | state 0 is compared right after `init`; a leak fails immediately                                           |
 | `init` per trace is expensive for a full system start      | documented; prefer a cheap reset function over `mount/start`                                               |
 | ghost vars surviving a REPL reload                         | registry rebuilt per run; unused-handler coverage report                                                   |

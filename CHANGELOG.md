@@ -22,6 +22,13 @@ Nothing since 0.3.0.
 - `:unnamed-driver` — a scoped annotation in a driver with no `:name`. The
   question it asks has no answer, and guessing either way is silent.
 
+  The scope names a driver rather than a spec because a driver map already
+  carries `:spec`, so naming the spec would be a second copy of what the driver
+  already states — and two drivers can share one spec while wanting different
+  lifecycle. What it does leave open is a typo: `:quint/driver :ledgr` is read
+  by nobody and reported by nobody, which is accepted on the same terms as the
+  stranded `:key-ns`.
+
   This key was added **without** the real spec [CLAUDE.md](CLAUDE.md) asks for.
   That is deliberate and recorded in
   [0009](docs/decisions/0009-driver-scope.md) §"The rule this was added
