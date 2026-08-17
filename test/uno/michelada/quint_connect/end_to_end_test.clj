@@ -112,6 +112,68 @@
   (testing "and against the implementation as written"
     (qt/replay-file bank committed)))
 
+;; --- a scripted run, from a spec that records its own actions -------------
+
+(q/defdriver tracked
+  {:spec        "dev/fixtures/tracked.qnt"
+   :main        "trackedRuns"
+   :scan        '[bank.core]          ; the same implementation, unchanged
+   :action-path [:lastAction]
+   :nondet-path [:lastPick]})
+
+(deftest scripted-trace-replays-without-quint
+  (let [r (q/replay-file tracked "dev/fixtures/tracked_test_depositThenOverdraftTest.itf.json")]
+    (is (:ok? r))
+    (is (= 4 (:steps r)))
+    (is (= {"deposit" 1 "withdraw" 1 "overdraft" 1} (get-in r [:coverage :used])))))
+
+(deftest ^:integration check-run-drives-the-implementation-from-quint-test
+  (let [r (qt/check-run tracked {:test "depositThenOverdraftTest"})]
+    (is (:ok? r))
+    (is (= 1 (:traces r)) "a scripted run is one trace by definition")
+    (is (= 4 (:steps r)))
+    (is (empty? (get-in r [:coverage :unused])))))
+
+(deftest ^:integration check-run-reports-a-divergence-the-same-way
+  (with-redefs [bank/deposit buggy-deposit]
+    (let [r (q/check-run tracked {:test "depositThenOverdraftTest"})
+          f (:failure r)]
+      (is (false? (:ok? r)))
+      (is (= 1 (:step f)) "the scripted deposit is step 1")
+      (is (= "deposit" (:action f)))
+      (is (= {:who "alice" :amount 50} (:picks f)))
+      (is (= #'bank/deposit (:handler f)))
+      (is (= {:balances {"alice" 50 "bob" 0}} (:expected f)))
+      (is (= {:balances {"alice" 51 "bob" 0}} (:actual f))))))
+
+(deftest key-fn-reaches-the-decoder-from-the-driver
+  ;; collide_0.itf.json is recorded to be undecodable without a :key-fn, so the
+  ;; error it produces says whether the driver's option arrived at all.
+  (let [file  "dev/fixtures/collide_0.itf.json"
+        error #(try (q/replay-file % file) nil
+                    (catch clojure.lang.ExceptionInfo e (:quint/error (ex-data e))))]
+    (is (= :name-collision (error (q/driver {}))))
+    (is (= :no-init (error (q/driver {:key-fn (fn [n] (keyword (str/replace n "::" "-")))})))
+        "past decoding, and on to a complaint about the trace itself")))
+
+(deftest forgetting-the-paths-fails-in-two-legible-ways
+  (let [file "dev/fixtures/tracked_test_depositThenOverdraftTest.itf.json"
+        base {:spec "dev/fixtures/tracked.qnt" :main "trackedRuns" :scan '[bank.core]}]
+
+    (testing "first the spec's own bookkeeping arrives as state nothing supplies"
+      (let [r (q/replay-file (q/driver base) file)]
+        (is (false? (:ok? r)))
+        (is (= 0 (:step (:failure r))))
+        (is (contains? (:expected (:failure r)) :lastAction)
+            "which is the argument for splitting those variables out")))
+
+    (testing "and once they are ignored, the missing action names the fix"
+      (let [d (q/driver (assoc base :ignore #{:lastAction :lastPick}))
+            e (try (q/replay-file d file)
+                   (catch clojure.lang.ExceptionInfo ex ex))]
+        (is (= :unknown-action (:quint/error (ex-data e))))
+        (is (str/includes? (ex-message e) ":action-path"))))))
+
 (deftest ^:integration check-aggregates-across-traces
   (let [r (q/check bank {:traces 3 :max-steps 6 :seed 7})]
     (is (:ok? r))

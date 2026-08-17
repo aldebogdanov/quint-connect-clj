@@ -6,10 +6,10 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
-Nothing is released yet. Milestones M1–M6 of
+Nothing is released yet. Milestones M1–M6 and M7a of
 [docs/roadmap.md](docs/roadmap.md) are complete: the library runs a genuine
-model-based test end to end, and a failure it finds becomes a committed
-regression test.
+model-based test end to end, a failure it finds becomes a committed regression
+test, and a scripted Quint `run` drives the implementation too.
 
 ### Added
 
@@ -35,6 +35,17 @@ regression test.
   does it to a result you already hold, `:save-failure` turns it off or moves
   it, and `qt/replay-file` asserts on a promoted trace with no Quint involved.
   The workflow is [getting-started.md](docs/getting-started.md) §6.
+- Scripted runs — `q/check-run` and `qt/check-run` replay the trace of a named
+  Quint `run` through `quint test`. Because those traces carry no `mbt::`
+  variables, `:action-path` and `:nondet-path` read the action and the picks
+  from ordinary spec variables instead; each path's root variable is split out
+  of the compared state, so the implementation is never asked to supply the
+  spec's own bookkeeping. A sum-type action name is reachable by ending the
+  path at `:tag`. New errors: `:bad-decode-path` and `:test-failed`, the
+  latter for a spec whose own `.expect` does not hold.
+- The driver's `:key-fn` now reaches the decoder. It was documented in M1 and
+  accepted by `itf/itf->trace`, but `check` and `replay-file` never passed it
+  down.
 - Annotation keys are plain `:quint/*` keywords requiring no `:require`, so an
   annotated namespace takes on no dependency. A driver may move all five at
   once with `:key-ns`.

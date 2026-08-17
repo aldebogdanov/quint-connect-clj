@@ -43,7 +43,8 @@
                                      "the spec took an anonymous action; name the combined action in the spec"
                                      {:known (set (keys actions))})
     (nil? action)              (fail :unknown-action
-                                     "trace carries no mbt::actionTaken; generate it with quint run --mbt"
+                                     (str "trace carries no action: generate it with quint run --mbt,"
+                                          " or point :action-path at the variable the spec records it in")
                                      {:known (set (keys actions))})
     :else                      (fail :unknown-action
                                      (str "no handler for action " (pr-str action))

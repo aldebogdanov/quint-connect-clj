@@ -93,6 +93,42 @@ must say so in the error message.
 - Default backend is `rust`; `typescript` is available and behaves differently
   (see below).
 
+### `quint test`, recorded 2026-08-17 on 0.32.0
+
+- `--match` takes a **regex**, so a name must be anchored (`--match=^name$`) or
+  `depositTest` also selects `depositTestTwo`.
+- A name that matches nothing **exits 0 and writes no file**. Silence is the
+  whole signal, which is why `test!` turns an empty result into `:no-traces`.
+- A run whose `.expect` does not hold exits **1** with `error: Tests failed` —
+  and still writes the trace. That is a bug in the spec, before any
+  implementation is involved, so it gets its own `:test-failed`.
+- A spec that records its own action needs nothing special from the tool: an
+  ordinary `var lastAction: str` and a record `var lastPick: {...}` come out as
+  plain state, which `:action-path` and `:nondet-path` then split off. Fixture:
+  `tracked_test_depositThenOverdraftTest.itf.json`.
+- Variables in a module that imports with `.*` and no instantiation carry **no
+  path prefix** at all (`count`, not `runs::counter::count`). The prefix comes
+  from instantiation, as in `import bank(ACCOUNTS = ...)`.
+
+### `quint verify`, recorded 2026-08-17 on 0.32.0 with Apalache 0.56.1
+
+Recorded while planning M7b; none of it is implemented yet.
+
+- The invariant holding is exit **0**, `[ok] No violation found (3977ms)`.
+- A violation is exit **1**, `error: found a counterexample`, and the trace is
+  written to `--out-itf`. So exit 1 alone cannot be read as failure: the words
+  have to be checked.
+- `--out-itf` is documented as suppressing console output. It does not — the
+  counterexample states were still printed.
+- The counterexample is Apalache's own ITF dialect: `#meta.varTypes` is
+  present, **`#meta.source` is absent**, and there are no `mbt::` variables.
+- Apalache 0.56.1 is downloaded on first use (~2 minutes) and runs as a server
+  on port 8822. It exits with the command — no orphan JVM was left behind.
+- It writes an `_apalache-out/` directory into the working directory, which is
+  the spec's own directory the way quint-connect invokes Quint today.
+- Cost is spec-dependent and can be large: 4 s to confirm `noNegatives`, 114 s
+  to find a counterexample to `balances.get(a) <= 50` on the toy bank.
+
 ## Large integers: a real trap
 
 On the **default rust backend**, integers with absolute value `>= 10^15` are

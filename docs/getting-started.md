@@ -227,6 +227,60 @@ installed, in milliseconds, on exactly the interleaving that broke you once.
 have in hand — from `q/check` at the REPL, for instance. It returns the result
 with the path added at `[:failure :saved]`.
 
+## 7. Replaying a scripted run
+
+Everything above generates traces at random. A Quint `run` is the opposite: a
+scenario someone wrote down because it must keep working.
+
+```
+module counterRuns {
+  import counter.*
+
+  run addThenTakeTest = init.then(add(7)).then(take(3))
+}
+```
+
+One catch, and it is the reason this needs anything new. `quint test` does not
+accept `--mbt`, and its traces carry no `mbt::actionTaken` — so nothing in the
+trace says which action was taken. The spec has to record that itself:
+
+```
+  var lastAction: str
+  var lastPick: { n: int }
+
+  action add(n: int): bool = all {
+    count' = count + n,
+    lastAction' = "add",           // what happened
+    lastPick' = { n: n },          // and with which pick
+  }
+```
+
+The driver says where to read them, and `qt/check-run` names the run:
+
+```clojure
+(q/defdriver counter
+  {:spec        "spec/counter.qnt"
+   :main        "counterRuns"
+   :scan        '[myapp.core]
+   :action-path [:lastAction]      ; a get-in path, applied to the state
+   :nondet-path [:lastPick]})
+
+(deftest the-scenario-that-must-keep-working
+  (qt/check-run counter {:test "addThenTakeTest"}))
+```
+
+`lastAction` and `lastPick` are **not** compared against your application —
+each path's root variable leaves the state, because tracking the action is the
+spec's own bookkeeping and your code should know nothing about it. If you
+forget the paths, you find out twice over: first as a diff against a
+`:lastAction` nothing supplies, then as `:unknown-action` naming the option.
+
+For a sum type, end the path at the tag: `:action-path [:lastAction :tag]`
+reads `Deposit(...)` as `"Deposit"`.
+
+`quint verify` emits no `mbt::` variables either, so a spec written this way is
+also ready for M7b.
+
 ## The whole vocabulary
 
 Five keys, qualified by `quint`, requiring nothing.
@@ -255,7 +309,11 @@ If `quint` collides with something, a driver can move all five at once with
    :ignore  #{:lastOp}                        ; variables not compared
    :compare {:count (fn [expected actual] ...)}
    :actions {"transfer" (fn [picks] ...)}     ; wins over the scan
-   :state   {:pending (fn [] ...)}})          ; wins over the scan
+   :state   {:pending (fn [] ...)}            ; wins over the scan
+
+   :action-path [:lastAction]                 ; for traces with no mbt:: — see §7
+   :nondet-path [:lastPick]
+   :key-fn  (fn [full-name] ...)})            ; variable name -> keyword
 ```
 
 `qt/check` options: `:traces`, `:max-steps`, `:max-samples`, `:seed`,
@@ -272,7 +330,7 @@ recorded failure a deterministic regression test — see §6.
 - **Not released.** No Clojars artifact and no license yet.
 - **`:missing-state` is not implemented.** A spec variable that no reader
   supplies shows up as a diff against `{}` rather than a clear error.
-- **Only `quint run --mbt` drives anything.** `quint test` and `quint verify`
-  emit no action metadata; that is M7.
+- **`quint verify` is not wired up yet.** That is M7b. `quint test` is, through
+  `check-run`, provided the spec records its own action — see §7.
 - **A stranded `:key-ns`** — annotations left under the old qualifier — is
   ignored silently unless the whole namespace scans empty.

@@ -241,9 +241,15 @@ touch application code.
    :ignore   #{:lastError}
    :compare  {:balances my-fn}
 
-   ;; --- where the action metadata lives (advanced, M7) -------------------
-   :action-path []                          ; default: mbt::actionTaken
-   :nondet-path []})                        ; default: mbt::nondetPicks
+   ;; --- where the action metadata lives ----------------------------------
+   ;; Unset, the decoder reads mbt::actionTaken and mbt::nondetPicks. Set,
+   ;; they are get-in paths into ordinary spec variables, for the traces that
+   ;; carry no mbt:: at all — `quint test` and `quint verify`. The variable
+   ;; each path starts at leaves the compared state.
+   :action-path [:lastAction]
+   :nondet-path [:lastPick]
+
+   :key-fn      (fn [full-name] ...)})      ; variable name -> keyword
 ```
 
 Handlers written in `:actions` take the **picks map**, not positional arguments,
@@ -334,9 +340,14 @@ Caveat, verified against Quint 0.32.0: **`quint test` does not accept `--mbt`**
 and its traces contain no `mbt::actionTaken`/`mbt::nondetPicks`. Same for
 `quint verify`. Only `quint run --mbt` yields action metadata. So `check-run`
 and `verify` require the spec to track the action itself in a normal variable,
-which is what `:action-path` / `:nondet-path` are for. Documented in
-[notes/itf-format.md](notes/itf-format.md); it is why M7 is a milestone rather
-than a flag.
+which is what `:action-path` / `:nondet-path` are for — the reason those two
+modes are a milestone rather than a flag. Documented in
+[notes/itf-format.md](notes/itf-format.md), and demonstrated by
+`dev/fixtures/tracked.qnt`, which is the same bank as `bank.qnt` with two
+bookkeeping variables added and therefore replays against the same unchanged
+`dev/bank/core.clj`.
+
+`verify` is not implemented yet; `check-run` is.
 
 ### From a random failure to a committed trace
 

@@ -9,6 +9,9 @@ the commands in [../../docs/notes/itf-format.md](../../docs/notes/itf-format.md)
 | `bank.qnt`                                  | toy spec: `bank`, `bankTest` (simulation), `bankRuns` (scripted run) |
 | `bank_run_0/1.itf.json`                     | `quint run --mbt`, seed 42 — the normal case              |
 | `bank_test_depositThenWithdrawTest.itf.json`| `quint test` — note the absent `mbt::` variables          |
+| `tracked.qnt`                               | the same bank, recording its own action in `lastAction` and its picks in `lastPick`; `trackedTest` (simulation), `trackedRuns` (scripted run), `trackedBroken` (a run whose expectation fails) |
+| `tracked_test_depositThenOverdraftTest.itf.json` | `quint test` — no `mbt::`, so `:action-path` is the only way it drives anything |
+| `tracked_run_0.itf.json`                    | `quint run --mbt` of the same spec — carries both mechanisms, which is what proves they agree |
 | `shapes.qnt`, `shapes_0.itf.json`           | one instance of every ITF value encoding, lists included  |
 | `bigint.qnt`, `bigint_rust_0.itf.json`      | large-integer serialization quirk on the rust backend     |
 | `bigint_typescript_0.itf.json`              | the same spec, encoded correctly by the typescript backend |

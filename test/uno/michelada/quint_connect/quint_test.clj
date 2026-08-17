@@ -80,3 +80,40 @@
 
 (deftest ^:integration missing-spec-is-typed
   (is (= :quint-failed (error-of #(quint/run! {:traces 1})))))
+
+;; --- quint test: one scripted run ------------------------------------------
+
+(def ^:private tracked-spec "dev/fixtures/tracked.qnt")
+
+(deftest ^:integration runs-one-named-test
+  (let [{:keys [traces cmd]} (quint/test! {:spec tracked-spec :main "trackedRuns"
+                                           :test "depositThenOverdraftTest"})]
+    (is (= 1 (count traces)))
+    (is (= "test_depositThenOverdraftTest_0.itf.json" (:name (first traces))))
+    (is (str/includes? (str/join " " cmd) "--match=^depositThenOverdraftTest$")
+        "anchored, so one name cannot select another that starts with it")
+
+    (testing "the trace carries no mbt:: and needs the spec's own variables"
+      (let [json (:json (first traces))
+            bare (itf/itf->trace (itf/json->itf json))
+            path (itf/itf->trace (itf/json->itf json)
+                                 {:action-path [:lastAction] :nondet-path [:lastPick]})]
+        (is (every? #(nil? (:action %)) (:states bare)))
+        (is (= ["init" "deposit" "withdraw" "overdraft"] (mapv :action (:states path))))))))
+
+(deftest ^:integration a-name-that-matches-nothing-is-no-traces
+  ;; Quint exits 0 and writes nothing at all, so silence has to become an error
+  ;; here or the run would look like a pass.
+  (is (= :no-traces
+         (error-of #(quint/test! {:spec tracked-spec :main "trackedRuns"
+                                  :test "noSuchTest"})))))
+
+(deftest ^:integration a-failing-expectation-blames-the-spec
+  (let [e (try (quint/test! {:spec tracked-spec :main "trackedBroken" :test "brokenTest"})
+               (catch clojure.lang.ExceptionInfo ex ex))]
+    (is (= :test-failed (:quint/error (ex-data e))))
+    (is (str/includes? (ex-message e) "bug in the spec"))
+    (is (= "brokenTest" (:test (ex-data e))))))
+
+(deftest ^:integration test-without-a-name-is-typed
+  (is (= :quint-failed (error-of #(quint/test! {:spec tracked-spec})))))

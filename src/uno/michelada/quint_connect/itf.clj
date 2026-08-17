@@ -106,6 +106,62 @@
    {:action nil :picks {} :state {}}
    state))
 
+(defn- path!
+  "A decode path is a vector of keys for `get-in`, and nothing else. A bare
+  keyword is the likely mistake, so it gets said out loud."
+  [opt path]
+  (when-not (vector? path)
+    (fail :bad-decode-path
+          (str opt " must be a vector of keys, as in [:lastAction]; got " (pr-str path))
+          {:option opt :path path}))
+  path)
+
+(defn- action-at
+  "The action name a spec recorded for itself, from an ordinary variable."
+  [{:keys [index state]} path]
+  (let [v (get-in state path)]
+    (cond
+      (string? v) v
+      (nil? v)    (fail :bad-decode-path
+                        (str ":action-path " path " found nothing in state " index)
+                        {:option :action-path :path path :index index
+                         :vars (vec (sort (keys state)))})
+      :else       (fail :bad-decode-path
+                        (str ":action-path " path " found " (pr-str v) " in state " index
+                             ", which is not an action name."
+                             (when (:tag v) " For a sum type, end the path in :tag."))
+                        {:option :action-path :path path :index index :found v}))))
+
+(defn- picks-at
+  "The picks a spec recorded for itself. Not unwrapped: `Some`/`None` is
+  Quint's own encoding of `mbt::nondetPicks`, not something a spec author
+  writes into an ordinary variable."
+  [{:keys [index state]} path]
+  (let [v (get-in state path)]
+    (if (map? v)
+      v
+      (fail :bad-decode-path
+            (str ":nondet-path " path " found " (pr-str v) " in state " index
+                 ", and picks must be a record of pick name to value")
+            {:option :nondet-path :path path :index index :found v}))))
+
+(defn- roots
+  "The state variables the given paths read out of."
+  [& paths]
+  (into [] (comp (remove nil?) (map first)) paths))
+
+(defn- tracked
+  "Take `:action` and `:picks` from ordinary state variables, for traces that
+  carry no `mbt::` metadata — `quint test` and `quint verify` emit none, and a
+  Choreo-style spec tracks them itself. Each path's root variable leaves
+  `:state`: it is the spec's own bookkeeping, and the implementation must not
+  be asked to supply it."
+  [st {:keys [action-path nondet-path]}]
+  (cond-> st
+    action-path (assoc :action (action-at st action-path))
+    nondet-path (assoc :picks (picks-at st nondet-path))
+    :always     (update :state #(apply dissoc % (roots action-path nondet-path)))))
+
 (defn- check-collisions! [key-fn full-names]
   (doseq [[k fulls] (reduce (fn [m f] (update m (key-fn f) (fnil conj #{}) f)) {} full-names)
           :when (< 1 (count fulls))]
@@ -129,32 +185,46 @@
 (defn itf->trace
   "Decode a parsed ITF map into a trace.
 
-  Takes the map from `json->itf` and optionally `{:key-fn f}`, where f maps a
-  full variable name to a keyword; it defaults to the last `::` segment and
-  never sees `mbt::` names. Names keep Quint's camelCase.
+  Takes the map from `json->itf` and optionally
 
-  Returns
+    :key-fn       full variable name -> keyword; defaults to the last `::`
+                  segment and never sees `mbt::` names
+    :action-path  path to a variable holding the action name, for traces
+                  with no `mbt::actionTaken`
+    :nondet-path  path to a variable holding the picks, likewise
+
+  Names keep Quint's camelCase. Returns
 
     {:source \"bank.qnt\"
      :vars   [:balances :lastError]
      :states [{:index 0 :action \"init\" :picks {} :state {...}} ...]}
 
   `:vars` comes from the state keys, not the file's `vars` array, which Quint
-  emits with duplicate `mbt::` entries. Traces without `mbt::` variables decode
-  with `:action` nil and `:picks` empty.
+  emits with duplicate `mbt::` entries. Traces without `mbt::` variables and
+  without the two paths decode with `:action` nil and `:picks` empty.
+
+  The paths are vectors for `get-in`, applied to the decoded state, and the
+  variable each one starts at is not part of `:state`: the spec's own
+  bookkeeping is not state the implementation has to supply. They take
+  precedence over `mbt::` variables when a trace happens to carry both.
 
   Throws `ex-info` with `:quint/error` `:bad-itf` for a malformed file or an
-  unsupported encoding, `:name-collision` when two variables normalize alike."
+  unsupported encoding, `:name-collision` when two variables normalize alike,
+  `:bad-decode-path` when a path is not a vector or does not lead to an action
+  name or a record of picks."
   ([itf] (itf->trace itf nil))
   ([itf opts]
    (let [key-fn (get opts :key-fn default-key-fn)
+         paths  (reduce (fn [m k] (cond-> m (get opts k) (assoc k (path! k (get opts k)))))
+                        {} [:action-path :nondet-path])
          states (get itf "states")]
      (when-not (vector? states)
        (fail :bad-itf "ITF has no states array" {:found (keys itf)}))
      (let [full-names (into #{} (comp (mapcat keys)
                                       (remove #{"#meta" action-var picks-var}))
-                            states)]
+                            states)
+           split      (set (roots (:action-path paths) (:nondet-path paths)))]
        (check-collisions! key-fn full-names)
        {:source (get-in itf ["#meta" "source"])
-        :vars   (vec (sort (map key-fn full-names)))
-        :states (mapv #(decode-state key-fn %) states)}))))
+        :vars   (vec (sort (remove split (map key-fn full-names))))
+        :states (mapv #(tracked (decode-state key-fn %) paths) states)}))))

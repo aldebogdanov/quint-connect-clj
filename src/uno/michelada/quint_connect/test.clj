@@ -59,6 +59,16 @@
                  {:path (str f) :cause e})))
        (assoc-in result [:failure :saved] (str f))))))
 
+(defn- asserted
+  "Run one of the core check functions, save the trace if it diverged, and turn
+  the result into a single assertion."
+  [f driver opts]
+  (let [save (get opts :save-failure (get driver :save-failure true))
+        r    (cond-> (f driver opts)
+               save (save-failure! (when (string? save) {:dir save})))]
+    (t/is (:ok? r) (report/result-str r))
+    r))
+
 (defn check
   "Run `core/check` and assert the result, so a divergence fails the enclosing
   `deftest` with the step, action, handler var, diff and reproduce line as its
@@ -70,11 +80,14 @@
   default) writes to `default-failure-dir`, a string writes to that directory,
   `false` writes nothing."
   [driver opts]
-  (let [save (get opts :save-failure (get driver :save-failure true))
-        r    (cond-> (core/check driver opts)
-               save (save-failure! (when (string? save) {:dir save})))]
-    (t/is (:ok? r) (report/result-str r))
-    r))
+  (asserted core/check driver opts))
+
+(defn check-run
+  "Run `core/check-run` and assert the result, exactly as `check` does — one
+  assertion, and the trace saved on divergence. `:test` names the scripted
+  `run` in the spec."
+  [driver opts]
+  (asserted core/check-run driver opts))
 
 (defn replay-file
   "Run `core/replay-file` and assert the result, so a trace committed by

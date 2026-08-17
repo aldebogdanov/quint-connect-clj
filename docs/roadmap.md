@@ -141,20 +141,47 @@ Turn a failure into a permanent regression test.
 
 ---
 
-## M7 — `verify` and scripted runs
+## M7a — Scripted runs (done)
+
+M7 was split in two: this half needs no new tool, and the other half brings a
+second model checker, minute-long runs and its own error taxonomy. `:action-path`
+is a prerequisite for both, since neither `quint test` nor `quint verify` emits
+`mbt::` variables.
+
+- `:action-path` / `:nondet-path`: read the action name and the picks from
+  ordinary spec variables. Each path's root variable is split out of the
+  compared state — the spec's bookkeeping is not state the implementation has
+  to supply. This is also what
+  [Choreo](https://github.com/informalsystems/choreo/)-style specs need.
+- `q/check-run` and `qt/check-run` — the trace of a named Quint `run`, via
+  `quint test --match`.
+- `dev/fixtures/tracked.qnt`: the bank again, recording its own action, so the
+  unchanged `dev/bank/core.clj` replays it.
+
+**Done when:** a spec that tracks its own action drives the driver, from a
+`quint test` trace with no `mbt::` variables in it.
+
+---
+
+## M7b — `verify`
 
 - `q/verify` — run Apalache through `quint verify`, treat "invariant holds" as a
   pass, and replay the counterexample against the implementation when it does
   not.
-- `q/check-run` — traces from a named Quint `run` via `quint test`.
-- `:action-path` / `:nondet-path`: read the action name and picks from ordinary
-  spec variables, since neither `quint test` nor `quint verify` emits `mbt::`
-  variables (verified on 0.32.0). This is also what
-  [Choreo](https://github.com/informalsystems/choreo/)-style specs need.
+- The behaviour this rests on is recorded in
+  [notes/itf-format.md](notes/itf-format.md) §`quint verify`: exit 1 means
+  either a counterexample or a broken spec and only the wording tells them
+  apart, the trace is Apalache's ITF dialect with no `#meta.source`, and a run
+  can take minutes.
+- Open question, to be answered by a probe first: Apalache writes
+  `_apalache-out/` into the working directory, which is the user's spec
+  directory. Likely fixed with an out-dir in `--apalache-config`; not verified.
+- Needs its own test tag and `bb` task, so `bb test:all` stays fast.
+- `#unserializable` stays deferred: the counterexample recorded so far contains
+  none, and there is still no recording to decode against.
 
 **Done when:** a spec with a deliberate invariant violation produces a
-counterexample that replays against the implementation, and a spec that tracks
-its own `actionTaken` variable drives the driver.
+counterexample that replays against the implementation.
 
 ---
 

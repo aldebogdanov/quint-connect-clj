@@ -81,6 +81,63 @@
            (first (:states tst))))
     (is (= 50 (get-in tst [:states 1 :state :balances "alice"])))))
 
+;; --- a spec that records the action itself --------------------------------
+
+(def ^:private tracked {:action-path [:lastAction] :nondet-path [:lastPick]})
+
+(deftest tracked-variables-drive-a-trace-with-no-mbt
+  (let [t (trace "tracked_test_depositThenOverdraftTest.itf.json" tracked)]
+    (is (= [:balances :lastError] (:vars t))
+        "the spec's bookkeeping is not state the implementation must supply")
+    (is (= {:index 1 :action "deposit" :picks {:who "alice" :amount 50}
+            :state {:balances {"alice" 50 "bob" 0} :lastError ""}}
+           (second (:states t))))
+    (is (= "overdraft" (get-in t [:states 3 :action])))
+    (is (= {:who "bob" :amount 5} (get-in t [:states 3 :picks])))
+
+    (testing "and without the paths the same file drives nothing"
+      (let [u (trace "tracked_test_depositThenOverdraftTest.itf.json")]
+        (is (every? #(nil? (:action %)) (:states u)))
+        (is (contains? (get-in u [:states 1 :state]) :lastAction))))))
+
+(deftest tracked-variables-and-mbt-agree
+  (let [name "tracked_run_0.itf.json"
+        m    (:states (trace name))
+        p    (:states (trace name tracked))]
+    (testing "on a trace carrying both, the paths win and say the same thing"
+      (is (= (map :action (rest m)) (map :action (rest p))))
+      (is (= (map :picks (rest m)) (map :picks (rest p)))))
+    (testing "except at step 0, where mbt:: has None and the spec has a value"
+      (is (= {} (:picks (first m))))
+      (is (= {:who "" :amount 0} (:picks (first p)))))))
+
+(deftest a-sum-type-action-name-is-reachable-by-path
+  (let [t (trace "shapes_0.itf.json" {:action-path [:aStatus :tag]})]
+    (is (= "Named" (get-in t [:states 1 :action])))
+    (is (not (contains? (get-in t [:states 1 :state]) :aStatus))
+        "the whole variable leaves the state, not just the tag")))
+
+(deftest a-path-that-leads-nowhere-is-typed
+  (testing "a bare keyword instead of a vector"
+    (is (= :bad-decode-path
+           (error-of #(trace "tracked_test_depositThenOverdraftTest.itf.json"
+                             {:action-path :lastAction})))))
+
+  (testing "a variable that is not there"
+    (is (= :bad-decode-path
+           (error-of #(trace "bank_run_0.itf.json" {:action-path [:nope]})))))
+
+  (testing "a variable that is not an action name, with the fix in the message"
+    (let [e (try (trace "shapes_0.itf.json" {:action-path [:aStatus]})
+                 (catch clojure.lang.ExceptionInfo e e))]
+      (is (= :bad-decode-path (:quint/error (ex-data e))))
+      (is (str/includes? (ex-message e) ":tag"))))
+
+  (testing "picks that are not a record"
+    (is (= :bad-decode-path
+           (error-of #(trace "tracked_test_depositThenOverdraftTest.itf.json"
+                             (assoc tracked :nondet-path [:lastError])))))))
+
 (deftest meta-noise-is-dropped
   (let [raw (fixture "bank_run_0.itf.json")
         t   (trace "bank_run_0.itf.json")

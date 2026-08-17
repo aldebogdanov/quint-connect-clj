@@ -81,12 +81,45 @@
     ;; Quint discard attempts that violate a precondition.
     :always     (conj (str "--max-samples=" (max (or max-samples 0) traces)))))
 
+(defn- test-args
+  "`quint test` has no `--mbt` and no `--n-traces`: one scripted run yields one
+  trace. `--match` is a regex, anchored here so `depositTest` cannot also
+  select `depositTestTwo`."
+  [{:keys [spec main test seed max-samples]} out-dir]
+  (cond-> ["test" (.getName (io/file spec))
+           (str "--out-itf=" out-dir "/test_{test}_{seq}.itf.json")
+           "--verbosity=0"]
+    main        (conj (str "--main=" main))
+    test        (conj (str "--match=^" test "$"))
+    seed        (conj (str "--seed=" seed))
+    max-samples (conj (str "--max-samples=" max-samples))))
+
 (defn- reproducible
   "The command as a user could re-run it: the scratch directory quint wrote to
   is deleted before we return, so a path to it reproduces nothing."
   [args]
-  (mapv #(if (str/starts-with? % "--out-itf=") "--out-itf=run_{seq}.itf.json" %)
+  (mapv #(if (str/starts-with? % "--out-itf=")
+           (if (str/includes? % "{test}")
+             "--out-itf=test_{test}_{seq}.itf.json"
+             "--out-itf=run_{seq}.itf.json")
+           %)
         (cons "quint" args)))
+
+(defn- in-scratch!
+  "Run quint in the spec's own directory, writing ITF into a scratch directory
+  that is deleted before returning; the files are read back first. Shared by
+  `run!` and `test!`, which differ in their arguments and in what a non-zero
+  exit means, not in this."
+  [spec args-fn]
+  (let [dir      (temp-dir!)
+        args     (args-fn dir)
+        spec-dir (.getParent (.getAbsoluteFile (io/file spec)))]
+    (try
+      (let [{:keys [exit out err]} (exec spec-dir args)]
+        {:exit exit :out out :err err
+         :cmd (reproducible args) :dir spec-dir :traces (collect dir)})
+      (finally
+        (delete-tree! dir)))))
 
 (defn run!
   "Generate traces with `quint run --mbt`.
@@ -112,20 +145,53 @@
   (when-not spec
     (fail :quint-failed "no :spec in the driver" {:opts opts}))
   @checked-version
-  (let [seed     (or (:seed opts) (rand-int Integer/MAX_VALUE))
-        dir      (temp-dir!)
-        args     (run-args (merge {:traces 10 :max-steps 20} opts {:seed seed}) dir)
-        spec-dir (.getParent (.getAbsoluteFile (io/file spec)))]
-    (try
-      (let [{:keys [exit out err]} (exec spec-dir args)]
-        (when-not (zero? exit)
-          (fail :quint-failed (str "quint exited " exit)
-                {:exit exit :cmd (reproducible args) :seed seed :dir spec-dir :stderr err :stdout out}))
-        (let [traces (collect dir)]
-          (when (empty? traces)
-            (fail :no-traces
-                  "quint wrote no traces; the spec may have no enabled actions"
-                  {:cmd (reproducible args) :seed seed :dir spec-dir :stderr err :stdout out}))
-          {:seed seed :dir spec-dir :cmd (reproducible args) :traces traces}))
-      (finally
-        (delete-tree! dir)))))
+  (let [seed (or (:seed opts) (rand-int Integer/MAX_VALUE))
+        {:keys [exit out err cmd dir traces]}
+        (in-scratch! spec #(run-args (merge {:traces 10 :max-steps 20} opts {:seed seed}) %))
+        info {:cmd cmd :seed seed :dir dir :stderr err :stdout out}]
+    (when-not (zero? exit)
+      (fail :quint-failed (str "quint exited " exit) (assoc info :exit exit)))
+    (when (empty? traces)
+      (fail :no-traces "quint wrote no traces; the spec may have no enabled actions" info))
+    {:seed seed :dir dir :cmd cmd :traces traces}))
+
+(defn test!
+  "Run one scripted Quint `run` through `quint test` and read its trace back.
+
+  Takes `:spec` and `:test` (both required), plus the optional `:main`,
+  `:seed` and `:max-samples`. `:test` is the name of a `run` in the spec and is
+  matched exactly. Returns the same shape as `run!`
+
+    {:seed 42 :dir \"/path/to/spec\" :cmd [\"quint\" ...]
+     :traces [{:name \"test_depositTest_0.itf.json\" :json \"...\"}]}
+
+  Note that `quint test` emits no `mbt::` variables at all, so the trace can
+  only drive an implementation if the spec records the action itself and the
+  driver says where with `:action-path` — see `itf/itf->trace`.
+
+  Throws `ex-info` with `:quint/error` `:quint-not-found`, `:test-failed` when
+  the spec's own `.expect` did not hold (a problem in the spec, not in the
+  implementation), `:quint-failed` for anything else non-zero, and `:no-traces`
+  when the name matched nothing — which Quint reports by exiting 0 and writing
+  no file."
+  [{:keys [spec test] :as opts}]
+  (when-not spec
+    (fail :quint-failed "no :spec in the driver" {:opts opts}))
+  (when-not test
+    (fail :quint-failed "no :test to run; name a `run` from the spec" {:opts opts}))
+  @checked-version
+  (let [seed (:seed opts)
+        {:keys [exit out err cmd dir traces]} (in-scratch! spec #(test-args opts %))
+        info {:cmd cmd :seed seed :dir dir :test test :stderr err :stdout out}]
+    (when-not (zero? exit)
+      (if (str/includes? (str out err) "Tests failed")
+        (fail :test-failed
+              (str "the spec's own test " (pr-str test) " failed its expectation;"
+                   " that is a bug in the spec, before any implementation is involved")
+              (assoc info :exit exit))
+        (fail :quint-failed (str "quint exited " exit) (assoc info :exit exit))))
+    (when (empty? traces)
+      (fail :no-traces
+            (str "no test named " (pr-str test) " in the spec")
+            info))
+    {:seed seed :dir dir :cmd cmd :traces traces}))

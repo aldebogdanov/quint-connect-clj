@@ -3,10 +3,10 @@
 Model-based testing for Clojure, driven by [Quint](https://quint-lang.org/)
 specifications.
 
-Status: **working, unreleased**. M1–M6 of
+Status: **working, unreleased**. M1–M6 and M7a of
 [docs/roadmap.md](docs/roadmap.md) are done: decoding, replay, the annotation
-registry, the Quint CLI, the public API and failure artifacts. `bb test` runs a
-real model-based test end to end. `verify` (M7) is next.
+registry, the Quint CLI, the public API, failure artifacts and scripted runs.
+`bb test` runs a real model-based test end to end. `verify` (M7b) is next.
 
 ## What it does
 
