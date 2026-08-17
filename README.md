@@ -182,9 +182,17 @@ Four runnable projects, each teaching one thing. Start at the first.
 | [tokens/](examples/tokens/) | `verify`: sampling versus proving, and why a green `verify` does not mean your code is right |
 | [queue/](examples/queue/) | `:quint/driver`: one implementation and one spec file, two drivers with different setup |
 
+Each is a self-contained project. They need `quint` on `PATH`
+(`npm i -g @informalsystems/quint`), because they generate traces rather than
+replaying committed ones:
+
 ```bash
 cd examples/counter && clojure -M:test
 ```
+
+They depend on the released coordinate, so a copied directory runs unchanged.
+Working on the library itself? `clojure -M:test:local` swaps in the working
+tree — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Requirements
 

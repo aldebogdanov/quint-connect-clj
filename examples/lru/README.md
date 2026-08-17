@@ -3,7 +3,10 @@
 A cache that holds three entries and evicts the least recently used. Small
 enough to read in a minute, and wrong in a way that is genuinely easy to ship.
 
-```
+Needs `quint` on `PATH` (`npm i -g @informalsystems/quint`): every example
+generates its traces rather than replaying committed ones.
+
+```bash
 clojure -M:test
 ```
 

@@ -3,7 +3,10 @@
 A bounded queue, specified once and instantiated twice — at capacity 2 and at
 capacity 5. One namespace, one spec file, **two drivers**.
 
-```
+Needs `quint` on `PATH` (`npm i -g @informalsystems/quint`): every example
+generates its traces rather than replaying committed ones.
+
+```bash
 clojure -M:test
 ```
 

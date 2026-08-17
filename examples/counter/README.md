@@ -3,7 +3,10 @@
 This is [docs/getting-started.md](../../docs/getting-started.md) §1–§5, as a
 project you can run instead of a tutorial you have to retype.
 
-```
+Needs `quint` on `PATH` (`npm i -g @informalsystems/quint`): every example
+generates its traces rather than replaying committed ones.
+
+```bash
 clojure -M:test
 ```
 

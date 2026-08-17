@@ -3,8 +3,13 @@
 A rate limiter holding five tokens. `grant` hands them out, `refill` puts them
 back, and the cap on refilling is the one line that is easy to get wrong.
 
-```
-clojure -M:test
+Needs `quint` on `PATH` (`npm i -g @informalsystems/quint`). The two `verify`
+tests additionally need Apalache, which `quint` downloads on first use — a
+couple of minutes, once. To skip them:
+
+```bash
+clojure -M:test            # everything
+clojure -M:test -e :slow   # without Apalache
 ```
 
 This is the example for **`verify`**, and for the difference between the two
