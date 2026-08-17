@@ -2,4 +2,14 @@
 ;; cannot know that without expanding the macro, so every driver name reads as
 ;; an unresolved symbol at its use sites. Linting it as `def` is the whole fix;
 ;; a hook would buy nothing until it also checks the driver map, which is M8.
-{:lint-as {org.clojars.aldebogdanov.quint-connect.core/defdriver clojure.core/def}}
+{:lint-as {org.clojars.aldebogdanov.quint-connect.core/defdriver clojure.core/def}
+
+ :linters
+ {;; Both of these are private, both are never called, and that is the point:
+  ;; they exist to prove that `ns-interns` sees `defn-` where `ns-publics`
+  ;; does not. registry-test asserts on the first one. Excluding them by name
+  ;; keeps CI strict about every other warning instead of waving all of them
+  ;; through with --fail-level.
+  :unused-private-var
+  {:exclude [meta-probe/audit
+             org.clojars.aldebogdanov.quint-connect.fixtures.forms/audit]}}}
