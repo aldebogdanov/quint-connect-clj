@@ -41,7 +41,11 @@ Nothing since 0.3.0.
   legitimately empty for this one and is no longer reported as the
   `^{...} (defn ...)` trap.
 
-## [0.2.0] — 2026-08-18
+## [0.2.0] — 2026-08-18 (never published)
+
+Cut but not released: `:quint/driver` landed before it went out, and it shipped
+as part of 0.3.0 instead. There is no `v0.2.0` tag and no Clojars artifact; the
+entry is kept because the work is real and 0.3.0's notes assume it.
 
 `verify` (M7b), which completes the roadmap: every planned milestone is done.
 
