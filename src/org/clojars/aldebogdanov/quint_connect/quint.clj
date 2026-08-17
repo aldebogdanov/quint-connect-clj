@@ -94,28 +94,46 @@
     seed        (conj (str "--seed=" seed))
     max-samples (conj (str "--max-samples=" max-samples))))
 
+(defn- verify-args
+  "`quint verify` takes the spec by absolute path, because unlike `run` and
+  `test` it is invoked from the scratch directory rather than the spec's own.
+  See `in-scratch!` for why."
+  [{:keys [spec main invariant init-action step-action max-steps]} out-dir]
+  (cond-> ["verify" (.getAbsolutePath (io/file spec))
+           (str "--out-itf=" out-dir "/verify.itf.json")
+           "--verbosity=0"]
+    main        (conj (str "--main=" main))
+    invariant   (conj (str "--invariant=" invariant))
+    init-action (conj (str "--init=" init-action))
+    step-action (conj (str "--step=" step-action))
+    max-steps   (conj (str "--max-steps=" max-steps))))
+
 (defn- reproducible
   "The command as a user could re-run it: the scratch directory quint wrote to
-  is deleted before we return, so a path to it reproduces nothing."
+  is deleted before we return, so the ITF path is reduced to its basename."
   [args]
   (mapv #(if (str/starts-with? % "--out-itf=")
-           (if (str/includes? % "{test}")
-             "--out-itf=test_{test}_{seq}.itf.json"
-             "--out-itf=run_{seq}.itf.json")
+           (str "--out-itf=" (.getName (io/file (subs % (count "--out-itf=")))))
            %)
         (cons "quint" args)))
 
 (defn- in-scratch!
-  "Run quint in the spec's own directory, writing ITF into a scratch directory
-  that is deleted before returning; the files are read back first. Shared by
-  `run!` and `test!`, which differ in their arguments and in what a non-zero
-  exit means, not in this."
-  [spec args-fn]
+  "Run quint with ITF going into a scratch directory that is deleted before
+  returning, the files having been read back out of it first.
+
+  `:run-in` says where quint itself runs. `:spec-dir` is the spec's own
+  directory, which `run` and `test` want so that sibling modules resolve and
+  `#meta.source` stays a bare filename. `:scratch` is the scratch directory,
+  which `verify` needs: Apalache writes an `_apalache-out/` directory of logs
+  into the working directory, and the user's spec directory is the wrong place
+  for it. The spec is passed absolute in that case, and the logs are deleted
+  along with everything else here. See docs/notes/itf-format.md."
+  [{:keys [spec run-in]} args-fn]
   (let [dir      (temp-dir!)
         args     (args-fn dir)
         spec-dir (.getParent (.getAbsoluteFile (io/file spec)))]
     (try
-      (let [{:keys [exit out err]} (exec spec-dir args)]
+      (let [{:keys [exit out err]} (exec (if (= :scratch run-in) dir spec-dir) args)]
         {:exit exit :out out :err err
          :cmd (reproducible args) :dir spec-dir :traces (collect dir)})
       (finally
@@ -147,7 +165,8 @@
   @checked-version
   (let [seed (or (:seed opts) (rand-int Integer/MAX_VALUE))
         {:keys [exit out err cmd dir traces]}
-        (in-scratch! spec #(run-args (merge {:traces 10 :max-steps 20} opts {:seed seed}) %))
+        (in-scratch! {:spec spec :run-in :spec-dir}
+                     #(run-args (merge {:traces 10 :max-steps 20} opts {:seed seed}) %))
         info {:cmd cmd :seed seed :dir dir :stderr err :stdout out}]
     (when-not (zero? exit)
       (fail :quint-failed (str "quint exited " exit) (assoc info :exit exit)))
@@ -181,7 +200,8 @@
     (fail :quint-failed "no :test to run; name a `run` from the spec" {:opts opts}))
   @checked-version
   (let [seed (:seed opts)
-        {:keys [exit out err cmd dir traces]} (in-scratch! spec #(test-args opts %))
+        {:keys [exit out err cmd dir traces]}
+        (in-scratch! {:spec spec :run-in :spec-dir} #(test-args opts %))
         info {:cmd cmd :seed seed :dir dir :test test :stderr err :stdout out}]
     (when-not (zero? exit)
       (if (str/includes? (str out err) "Tests failed")
@@ -195,3 +215,50 @@
             (str "no test named " (pr-str test) " in the spec")
             info))
     {:seed seed :dir dir :cmd cmd :traces traces}))
+
+(defn verify!
+  "Check an invariant with `quint verify`, which runs Apalache.
+
+  Takes `:spec` and `:invariant` (both required), plus the optional `:main`,
+  `:init-action`, `:step-action` and `:max-steps`. Returns
+
+    {:holds? true  :cmd [\"quint\" ...] :dir \"/path/to/spec\" :traces []}
+    {:holds? false :cmd [\"quint\" ...] :dir \"/path/to/spec\"
+     :traces [{:name \"verify.itf.json\" :json \"...\"}]}
+
+  The outcome is not in the exit code. Holding exits 0; a counterexample, an
+  unknown invariant name, a spec that does not typecheck and a missing file all
+  exit 1. What separates them is whether a trace was written, which is what
+  this branches on — recorded in docs/notes/itf-format.md §`quint verify` and
+  reproducible with dev/probes/verify_probe.sh.
+
+  An invariant that holds writes no trace, so an empty result is the pass here
+  and not the `:no-traces` error that `run!` and `test!` raise.
+
+  Runs in a scratch directory rather than the spec's own, because Apalache
+  writes `_apalache-out/` into the working directory; those logs are deleted
+  with the scratch directory. Apalache is downloaded on first use and a run can
+  take minutes.
+
+  Throws `ex-info` with `:quint/error` `:quint-not-found`, or `:quint-failed`
+  when quint exited non-zero without writing a counterexample — carrying
+  Quint's own stderr, which is where the reason is."
+  [{:keys [spec invariant] :as opts}]
+  (when-not spec
+    (fail :quint-failed "no :spec in the driver" {:opts opts}))
+  (when-not invariant
+    (fail :quint-failed "no :invariant to check; name a val from the spec"
+          {:opts opts}))
+  @checked-version
+  (let [{:keys [exit out err cmd dir traces]}
+        (in-scratch! {:spec spec :run-in :scratch} #(verify-args opts %))]
+    (cond
+      (zero? exit) {:holds? true  :cmd cmd :dir dir :traces []}
+      (seq traces) {:holds? false :cmd cmd :dir dir :traces traces}
+      :else        (fail :quint-failed
+                         (str "quint verify exited " exit " and wrote no"
+                              " counterexample, so the invariant was never"
+                              " checked; the spec or the invariant name is the"
+                              " likely cause")
+                         {:cmd cmd :dir dir :invariant invariant :exit exit
+                          :stderr err :stdout out}))))

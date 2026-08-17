@@ -22,8 +22,26 @@
   [cmd]
   (or (some #(second (re-matches #"(?:.*/)?([^/]+)\.qnt" %)) cmd) "trace"))
 
-(defn- artifact-name [{:keys [seed cmd failure]}]
-  (str (spec-name cmd) "-seed" seed "-trace" (:trace failure) ".itf.json"))
+(defn- artifact
+  "The trace worth keeping, or nil: what to write, what to call it, and where
+  in the result to record the path.
+
+  A counterexample comes first because a `verify` result may carry both — and
+  when it does, they are the same trace. Naming it after the invariant rather
+  than after a seed is the honest name: Apalache did not roll dice, so there is
+  no seed to reproduce it with, and re-checking the same invariant should
+  rewrite the same file."
+  [{:keys [seed cmd failure invariant]}]
+  (cond
+    (:trace-json invariant)
+    {:json (:trace-json invariant)
+     :name (str (spec-name cmd) "-" (:name invariant) "-counterexample.itf.json")
+     :at   [:invariant :saved]}
+
+    (:trace-json failure)
+    {:json (:trace-json failure)
+     :name (str (spec-name cmd) "-seed" seed "-trace" (:trace failure) ".itf.json")
+     :at   [:failure :saved]}))
 
 (defn save-failure!
   "Write the failing trace of a `core/check` result to disk, and return the
@@ -45,19 +63,19 @@
   written: an unwritable directory is a mistake to fix, not something to
   discover as an `IOException` in place of the divergence that caused it."
   ([result] (save-failure! result nil))
-  ([{:keys [failure] :as result} {:keys [dir] fname :name}]
-   (if-not (:trace-json failure)
-     result
-     (let [f (io/file (or dir default-failure-dir) (or fname (artifact-name result)))]
+  ([result {:keys [dir] fname :name}]
+   (if-let [{:keys [json at] auto :name} (artifact result)]
+     (let [f (io/file (or dir default-failure-dir) (or fname auto))]
        (try
          (io/make-parents f)
-         (spit f (:trace-json failure))
+         (spit f json)
          (catch java.io.IOException e
            (fail :save-failed
                  (str "could not write the failing trace to " f
                       "; fix the directory or pass :save-failure false")
                  {:path (str f) :cause e})))
-       (assoc-in result [:failure :saved] (str f))))))
+       (assoc-in result at (str f)))
+     result)))
 
 (defn- asserted
   "Run one of the core check functions, save the trace if it diverged, and turn
@@ -88,6 +106,22 @@
   `run` in the spec."
   [driver opts]
   (asserted core/check-run driver opts))
+
+(defn verify
+  "Run `core/verify` and assert the result, so a violated invariant fails the
+  enclosing `deftest` with the counterexample and, when the implementation
+  disagrees with it, the diverging step. `:invariant` names a `val` in the
+  spec.
+
+  The counterexample is saved exactly as a divergence is, under
+  `<spec>-<invariant>-counterexample.itf.json` — and it is saved even when the
+  implementation matched it, because the trace that violated the invariant is
+  worth keeping either way.
+
+  Slow: this runs Apalache, which is downloaded on first use and can take
+  minutes. Tag the deftest so it stays out of the fast suite."
+  [driver opts]
+  (asserted core/verify driver opts))
 
 (defn replay-file
   "Run `core/replay-file` and assert the result, so a trace committed by

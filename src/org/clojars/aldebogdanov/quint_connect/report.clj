@@ -8,16 +8,30 @@
 (defn- row [label v]
   (str "  " (format "%-9s" label) v))
 
+(defn- headline
+  "What went wrong, in one line. A `verify` result leads with the invariant,
+  because a violated invariant is the finding even when the implementation
+  matches the counterexample step for step."
+  [{:keys [seed traces failure invariant]}]
+  (if invariant
+    (str "invariant " (pr-str (:name invariant)) " does not hold"
+         (if failure
+           ", and the implementation does not match the counterexample"
+           (str "; the implementation reproduces it faithfully, so the spec"
+                " is where to look")))
+    (str "spec and implementation diverged on trace " (:trace failure)
+         " of " traces ", seed " seed)))
+
 (defn result-str
-  "Render a `core/check` result: which trace of how many diverged, the failure
-  itself, where the trace was saved, and the command that reproduces it. Nil
-  when the result is `:ok?`."
-  [{:keys [ok? seed traces cmd dir failure] :as result}]
+  "Render a `core/check`, `core/check-run` or `core/verify` result: what went
+  wrong, the failure itself, where the trace was saved, and the command that
+  reproduces it. Nil when the result is `:ok?`."
+  [{:keys [ok? cmd dir failure invariant] :as result}]
   (when-not ok?
-    (->> [(str "spec and implementation diverged on trace " (:trace failure)
-               " of " traces ", seed " seed)
+    (->> [(headline result)
           (failure-str result)
-          (when-let [saved (:saved failure)] (str "  saved      " saved))
+          (when-let [saved (or (:saved failure) (:saved invariant))]
+            (str "  saved      " saved))
           (when cmd (str "  reproduce  "
                          (when dir (str "cd " dir " && "))
                          (str/join " " cmd)))]

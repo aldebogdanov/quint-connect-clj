@@ -1,9 +1,12 @@
 {:tasks
  {test     {:doc  "Run tests that need no Quint installed"
-            :task (shell "clojure -M:test -e :integration")}
+            :task (shell "clojure -M:test -e :integration -e :slow")}
 
-  test:all {:doc  "Run every test, including those that shell out to quint"
-            :task (shell "clojure -M:test")}
+  test:all {:doc  "Run every test that shells out to quint, minus the slow ones"
+            :task (shell "clojure -M:test -e :slow")}
+
+  test:verify {:doc  "Only the verify tests: these run Apalache and take minutes"
+               :task (shell "clojure -M:test -i :slow")}
 
   jar      {:doc  "Build the library jar into target/"
             :task (shell "clojure -T:build jar")}

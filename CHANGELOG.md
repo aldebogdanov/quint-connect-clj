@@ -6,7 +6,43 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
-Nothing since 0.1.0.
+Nothing since 0.2.0.
+
+## [0.2.0] — 2026-08-18
+
+`verify` (M7b), which completes the roadmap: every planned milestone is done.
+
+### Added
+
+- `q/verify` and `qt/verify` — check an invariant with Apalache through
+  `quint verify`, and replay the counterexample against the implementation when
+  it does not hold. A violated invariant is a failure whether or not the
+  implementation agrees with the counterexample, because those are two facts:
+  `:invariant` says the spec's own property does not hold, and `:failure` says
+  the implementation diverged from the counterexample. A nil `:failure` there
+  means the code reproduces the spec's bug faithfully, and the message says so.
+- `quint/verify!` — the CLI half. The outcome is not in the exit code: holding
+  exits 0 and everything else exits 1, so this branches on whether a trace was
+  written. An invariant that holds writes none, which is why it cannot reuse
+  `:no-traces`.
+- Counterexamples are saved like divergences, named
+  `<spec>-<invariant>-counterexample.itf.json` — after the invariant rather
+  than a seed, because Apalache rolled no dice and re-checking rewrites the
+  same file. Saved even when nothing diverged.
+- `bb test:verify`, and a `^:slow` tag that keeps Apalache out of `bb test` and
+  `bb test:all`.
+- `dev/fixtures/tracked.qnt` gained `noNegatives` and `underFifty`, and
+  `tracked_verify_underFifty.itf.json` is a recorded counterexample that
+  replays with no Apalache installed.
+
+### Changed
+
+- `quint verify` runs in a scratch working directory instead of the spec's own,
+  because Apalache writes an `_apalache-out/` log directory into wherever it is
+  invoked. It is deleted with the scratch directory, so the spec directory
+  stays clean — there is a test for exactly that.
+- The reproduce line now keeps the ITF option's basename rather than
+  reconstructing it, which was wrong for `verify`'s single output file.
 
 ## [0.1.0] — 2026-08-18
 
@@ -66,9 +102,6 @@ behaviour recorded, but unbuilt. See "Known gaps" below before filing anything.
 - `:missing-state` is not implemented. A spec variable that no reader supplies
   shows up as a diff against nothing rather than a typed error. The driver
   never sees the spec, so this can only be caught at the first comparison.
-- `quint verify` is not wired up. Its traces carry no `mbt::` variables, so
-  they will drive an implementation the same way `quint test` traces already
-  do — through `:action-path` — but the mode itself is M7b.
 - An annotation stranded under the wrong `:key-ns` is ignored silently unless
   the whole namespace scans empty. See
   [0007](docs/decisions/0007-annotation-keys.md).

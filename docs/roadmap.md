@@ -165,7 +165,7 @@ is a prerequisite for both, since neither `quint test` nor `quint verify` emits
 
 ---
 
-## M7b — `verify`
+## M7b — `verify` (done)
 
 - `q/verify` — run Apalache through `quint verify`, treat "invariant holds" as a
   pass, and replay the counterexample against the implementation when it does
@@ -189,7 +189,10 @@ is a prerequisite for both, since neither `quint test` nor `quint verify` emits
   unchanged. M7b does not grow that namespace.
 
 **Done when:** a spec with a deliberate invariant violation produces a
-counterexample that replays against the implementation.
+counterexample that replays against the implementation. — Done.
+`tracked.qnt` gained `underFifty`, violated by a single deposit, and
+`tracked_verify_underFifty.itf.json` is the recorded counterexample, replayed
+by `bb test` with no Apalache anywhere. `bb test:verify` runs the real thing.
 
 ---
 

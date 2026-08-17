@@ -56,6 +56,12 @@ module tracked {
       overdraft(who, amount),
     }
   }
+
+  val noNegatives = ACCOUNTS.forall(a => balances.get(a) >= 0)
+
+  // Violated by one deposit of more than 50, which is what makes it worth
+  // recording: Apalache finds it at step 1 instead of after minutes of search.
+  val underFifty = ACCOUNTS.forall(a => balances.get(a) <= 50)
 }
 
 module trackedTest {

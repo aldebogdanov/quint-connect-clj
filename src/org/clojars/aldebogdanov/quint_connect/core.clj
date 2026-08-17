@@ -86,6 +86,57 @@
   [driver opts]
   (replay-all driver (quint/test! (merge driver opts))))
 
+(defn verify
+  "Check an invariant with Apalache, and replay the counterexample if there is
+  one.
+
+  Takes a resolved driver and an options map merged over it; `:invariant` names
+  a `val` in the spec and is required. `:max-steps` bounds the search. Returns
+  what `check` returns, plus `:invariant`:
+
+    {:ok? false :traces 1 :steps 2 :cmd [...] :dir \"...\"
+     :invariant {:name \"underFifty\" :holds? false
+                 :trace-name \"verify.itf.json\" :trace-json \"...\"}
+     :coverage {...}
+     :failure  nil}
+
+  A violated invariant is `:ok? false` whether or not the implementation
+  agrees with the counterexample, because those are two different facts and
+  both are reported. `:invariant` says the spec's own property does not hold.
+  `:failure` says the implementation diverged from the counterexample, and is
+  nil when it did not — which means the implementation reproduces the spec's
+  bug faithfully. That is a real answer, not a pass, and it points at the spec.
+
+  A holding invariant returns `:ok? true` with `:traces` 0 and no trace to
+  replay, since `quint verify` writes no file in that case.
+
+  Counterexamples carry no `mbt::` variables, so the driver needs the same
+  `:action-path` a scripted run needs; without it replay throws
+  `:unknown-action`.
+
+  Throws whatever `quint/verify!` and `replay/run-trace` throw."
+  [driver opts]
+  (let [o (merge driver opts)
+        {:keys [holds? cmd dir traces]} (quint/verify! o)
+        base {:seed nil :cmd cmd :dir dir}]
+    (if holds?
+      (assoc base :ok? true :traces 0 :steps 0
+             :invariant {:name (:invariant o) :holds? true}
+             :coverage (coverage driver {})
+             :failure nil)
+      (let [{:keys [name json]} (first traces)
+            r (replay-json driver json)]
+        (assoc base
+               :ok?       false
+               :traces    1
+               :steps     (:steps r)
+               :invariant {:name (:invariant o) :holds? false
+                           :trace-name name :trace-json json}
+               :coverage  (coverage driver (get-in r [:coverage :used]))
+               :failure   (some-> (:failure r)
+                                  (assoc :trace 0 :trace-name name
+                                         :trace-json json)))))))
+
 (defn replay-file
   "Replay one committed ITF file. Needs no Quint installed — this is what makes
   a recorded failure a deterministic regression test. Returns a

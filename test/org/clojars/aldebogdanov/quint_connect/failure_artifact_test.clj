@@ -82,3 +82,41 @@
     (is (= (str (io/file dir "bank-seed42-trace3.itf.json"))
            (get-in saved [:failure :saved]))
         "the directory the spec lives in is not part of the name")))
+
+;; --- a counterexample is an artifact too -----------------------------------
+
+(def ^:private counterexample (slurp "dev/fixtures/tracked_verify_underFifty.itf.json"))
+
+(def ^:private violated
+  "What `verify` returns when the invariant fails and the implementation
+  reproduces it: no :failure at all, and the trace hanging off :invariant."
+  {:ok?       false
+   :seed      nil
+   :traces    1
+   :cmd       ["quint" "verify" "/somewhere/tracked.qnt" "--invariant=underFifty"]
+   :invariant {:name "underFifty" :holds? false
+               :trace-name "verify.itf.json" :trace-json counterexample}
+   :failure   nil})
+
+(deftest a-counterexample-is-saved-even-though-nothing-diverged
+  (let [dir   (temp-dir)
+        saved (qt/save-failure! violated {:dir dir})
+        path  (get-in saved [:invariant :saved])]
+    (is (= (str (io/file dir "tracked-underFifty-counterexample.itf.json")) path)
+        "named after the invariant: Apalache rolled no dice, so there is no seed")
+    (is (= counterexample (slurp path)))
+    (is (nil? (get-in saved [:failure :saved])) "there was no failure to annotate")
+    (is (str/includes? (report/result-str saved) path)
+        "and the message says where it landed")))
+
+(deftest a-verify-result-that-also-diverged-still-saves-one-file
+  ;; Both keys carry the same trace in that case; writing it twice under two
+  ;; names would be two copies of one counterexample.
+  (let [dir   (temp-dir)
+        both  (assoc violated :failure {:trace 0 :trace-name "verify.itf.json"
+                                        :trace-json counterexample
+                                        :step 1 :action "deposit"})
+        saved (qt/save-failure! both {:dir dir})]
+    (is (= 1 (count (.listFiles (io/file dir)))))
+    (is (= (str (io/file dir "tracked-underFifty-counterexample.itf.json"))
+           (get-in saved [:invariant :saved])))))

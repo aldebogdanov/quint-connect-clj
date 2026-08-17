@@ -181,3 +181,63 @@
     (is (= 7 (:seed r)) "the seed is reported so a failure is reproducible")
     (is (pos? (:steps r)))
     (is (pos? (apply + (vals (get-in r [:coverage :used])))))))
+
+;; --- verify: an invariant, and the counterexample when it does not hold ----
+
+(q/defdriver checked
+  {:spec        "dev/fixtures/tracked.qnt"
+   :main        "trackedTest"
+   :scan        '[bank.core]          ; still the same implementation
+   :action-path [:lastAction]
+   :nondet-path [:lastPick]})
+
+(deftest committed-counterexample-replays-without-apalache
+  ;; Recorded from `quint verify --invariant=underFifty`. It carries no mbt::
+  ;; and no #meta.source, which is what :action-path is for.
+  (let [r (q/replay-file checked "dev/fixtures/tracked_verify_underFifty.itf.json")]
+    (is (:ok? r) "the implementation reproduces the spec's own bug")
+    (is (= 2 (:steps r)))
+    (is (= {"deposit" 1} (get-in r [:coverage :used])))))
+
+(deftest ^:slow a-violated-invariant-is-not-ok-even-when-the-code-agrees
+  (let [r (q/verify checked {:invariant "underFifty" :max-steps 2})]
+    (is (false? (:ok? r)) "a violated invariant fails, whoever is at fault")
+    (is (= {:holds? false} (select-keys (:invariant r) [:holds?])))
+    (is (= "underFifty" (get-in r [:invariant :name])))
+    (is (nil? (:failure r))
+        "the implementation matched the counterexample, so nothing diverged")
+    (is (= 1 (:traces r)))
+    (testing "and the message says which of the two facts it is"
+      (let [s (report/result-str r)]
+        (is (str/includes? s "underFifty"))
+        (is (str/includes? s "reproduces it faithfully"))))))
+
+(deftest ^:slow an-invariant-that-holds-is-a-pass-with-no-trace
+  (let [r (q/verify checked {:invariant "noNegatives" :max-steps 2})]
+    (is (:ok? r))
+    (is (true? (get-in r [:invariant :holds?])))
+    (is (= 0 (:traces r)) "holding writes no trace, and that is the pass")
+    (is (nil? (:failure r)))))
+
+(deftest ^:slow verify-also-reports-an-implementation-that-disagrees
+  (with-redefs [bank/deposit buggy-deposit]
+    (let [r (q/verify checked {:invariant "underFifty" :max-steps 2})]
+      (is (false? (:ok? r)))
+      (is (false? (get-in r [:invariant :holds?])) "the invariant still fails")
+      (is (some? (:failure r)) "and now the implementation does too")
+      (is (= "deposit" (:action (:failure r))))
+      (is (str/includes? (report/result-str r) "does not match the counterexample")))))
+
+(deftest ^:slow an-unknown-invariant-is-typed-not-a-counterexample
+  ;; Both exit 1; only the absence of a trace tells them apart.
+  (let [e (try (q/verify checked {:invariant "noSuchInvariant" :max-steps 2})
+               (catch clojure.lang.ExceptionInfo ex ex))]
+    (is (= :quint-failed (:quint/error (ex-data e))))
+    (is (str/includes? (ex-message e) "never checked"))))
+
+(deftest ^:slow the-spec-directory-stays-clean
+  ;; Apalache writes _apalache-out/ into its working directory, which is why
+  ;; verify runs in a scratch directory instead of the spec's own.
+  (q/verify checked {:invariant "noNegatives" :max-steps 2})
+  (is (not (.exists (io/file "dev/fixtures/_apalache-out")))
+      "the logs went to the scratch directory and died with it"))

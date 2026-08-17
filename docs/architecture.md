@@ -73,12 +73,20 @@ and artifact (`org.clojars.aldebogdanov/quint-connect`).
 Eight namespaces, none of which application code ever loads. If one passes
 ~200 lines, that is a signal to stop and reconsider, not to split it reflexively.
 
-`itf` passed it in M7a and stands at 230. Accepted as it is: it is one decoder
-of one format, and the halves a split would produce have no separate meaning.
-The acceptance is conditional on it stopping there, and M7b is the test of that
-— Apalache's ITF dialect and `#unserializable` both land in this namespace. If
-they do not fit, the conversation is `itf` versus an `itf.apalache` beside it,
-not a reflex split of what is already there.
+Two have passed it. `itf` stands at 230 and `quint` at 264.
+
+`itf` was accepted at 230 on the condition that M7b not grow it, and M7b did
+not: Apalache's dialect decodes through it unchanged, and `#unserializable`
+never appeared, so the namespace is untouched since M7a. That condition held
+and is now discharged.
+
+`quint` grew with `verify!` and is the one to watch. It is three commands
+against one CLI, sharing the version check, the scratch directory and the
+collection of ITF files, and the seam a split would follow — one namespace per
+subcommand — would triplicate all three. The honest reading is that it is over
+budget and that the fix is not obvious, so it is written down here instead of
+being performed. If a fourth subcommand arrives, that is the moment to reopen
+it rather than now.
 
 There is deliberately no keys namespace. An earlier design had one, existing
 only to be aliased so that `:quint/action` would resolve to a fully-qualified
@@ -373,7 +381,11 @@ modes are a milestone rather than a flag. Documented in
 bookkeeping variables added and therefore replays against the same unchanged
 `dev/bank/core.clj`.
 
-`verify` is not implemented yet; `check-run` is.
+All four modes are implemented. `verify` runs in a scratch working directory
+rather than the spec's own, because Apalache writes an `_apalache-out/`
+directory of logs into wherever it is invoked; that is the one place the
+two-phase split bends, and it is recorded in
+[notes/itf-format.md](notes/itf-format.md).
 
 ### From a random failure to a committed trace
 

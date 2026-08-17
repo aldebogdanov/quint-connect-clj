@@ -74,7 +74,7 @@ its classpath.
  :aliases
  {:test {:extra-paths ["test"]
          :extra-deps  {org.clojars.aldebogdanov/quint-connect
-                       {:mvn/version "0.1.0"}
+                       {:mvn/version "0.2.0"}
 
                        io.github.cognitect-labs/test-runner
                        {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
@@ -289,7 +289,50 @@ For a sum type, end the path at the tag: `:action-path [:lastAction :tag]`
 reads `Deposit(...)` as `"Deposit"`.
 
 `quint verify` emits no `mbt::` variables either, so a spec written this way is
-also ready for M7b.
+also ready for §8.
+
+## 8. Proving an invariant
+
+`check` looks for a divergence in traces Quint made up. `verify` asks Apalache
+whether a property can be broken at all, and hands you the counterexample when
+it can.
+
+```
+  val neverNegative = count >= 0
+```
+
+```clojure
+(deftest the-counter-never-goes-negative
+  (qt/verify counter {:invariant "neverNegative" :max-steps 8}))
+```
+
+Three outcomes, and the middle one is the interesting one:
+
+- **It holds.** `:ok? true`, no trace, nothing to replay. Apalache checked
+  every reachable state within `:max-steps`, which is a stronger statement than
+  any number of random traces.
+- **It does not hold, and your code matches the counterexample.** `:ok? false`
+  with `:failure` nil. The implementation is faithful and the *spec* is where
+  the bug is — you asked for something your own model does not guarantee.
+- **It does not hold, and your code disagrees with the counterexample too.**
+  `:ok? false` with a `:failure`, reported exactly as `check` reports one.
+
+A violated invariant fails the test in all of the last two cases. Those are two
+different facts and the message says which one you have.
+
+The counterexample is saved the way a divergence is, under
+`<spec>-<invariant>-counterexample.itf.json`. It is named after the invariant
+rather than a seed because Apalache did not roll dice: re-checking the same
+invariant rewrites the same file.
+
+Two things to know before you reach for it:
+
+- Counterexamples carry no `mbt::` variables, so the same `:action-path` from
+  §7 is required. Without it, replay throws `:unknown-action`.
+- It is **slow**. Apalache is downloaded on first use, and a search can take
+  minutes on a real spec. Tag those tests and keep them out of the suite you
+  run on every save — this repository uses `^:slow` and a `bb test:verify`
+  task.
 
 ## The whole vocabulary
 
@@ -337,14 +380,12 @@ recorded failure a deterministic regression test — see §6.
 
 ## Rough edges, honestly
 
-- **0.1.0 is a first release.** The API is the one described here and is not
+- **0.2.0 is an early release.** The API is the one described here and is not
   expected to move, but nothing has been used in anger by anyone but its
   author. The license is [EPL-2.0](../LICENSE), the same as Clojure's.
 - **`:missing-state` is not implemented.** A spec variable that no reader
   supplies shows up as a diff against nothing rather than a clear error. The
   driver never reads the spec, so the first trace is what reveals it.
-- **`quint verify` is not wired up yet.** That is M7b. `quint test` is, through
-  `check-run`, provided the spec records its own action — see §7.
 - **A stranded `:key-ns`** — annotations left under the old qualifier — is
   ignored silently unless the whole namespace scans empty.
 - **No `:setup`/`:teardown`.** Anything that must happen once per `check`, not
