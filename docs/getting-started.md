@@ -172,12 +172,60 @@ diverged at step 1, action "refuse"
   actual   {:count 7}
   in spec  {:count 0}
   in app   {:count 7}
+  saved      test-resources/quint-connect/failures/counter-seed633005521-trace0.itf.json
   reproduce  cd spec && quint run counter.qnt --mbt --seed=633005521 ...
 ```
 
 `handler` and `readers` are the payoff of declaring the mapping next to the
 code: the failure names the function that diverged and the one that observed
 it. The seed was generated for you, and the reproduce line is pasteable.
+
+## 6. Commit the trace that found it
+
+The trace was random. The next run uses a new seed and may not produce it
+again — so `qt/check` wrote it to disk before failing, which is the `saved`
+line above.
+
+That file is a complete trace in Quint's own ITF encoding. Replaying it needs
+no Quint and no randomness:
+
+```clojure
+(deftest refuse-does-not-change-the-count      ; the bug of 2026-08-17
+  (qt/replay-file counter "test-resources/quint-connect/counter-seed633005521-trace0.itf.json"))
+```
+
+Three steps, once per bug:
+
+1. **Run.** A divergence drops the trace in
+   `test-resources/quint-connect/failures/`. The name is
+   `<spec>-seed<seed>-trace<index>.itf.json` and it is deterministic, so
+   re-running the same failing seed rewrites one file rather than leaving a
+   pile of near-copies.
+2. **Promote what is worth keeping.** Gitignore the drop zone and `mv` the
+   trace one directory up, into `test-resources/quint-connect/`. Nothing is
+   committed by accident, and a failing run never dirties the repository:
+
+   ```
+   # .gitignore
+   test-resources/quint-connect/failures/
+   ```
+
+3. **Name it in a test.** `qt/replay-file` asserts the way `qt/check` does, and
+   fails with the same message. Fix the bug; the test stays.
+
+The result is a regression test that runs in CI on a machine with no Quint
+installed, in milliseconds, on exactly the interleaving that broke you once.
+
+`:save-failure` controls the writing, in `qt/check`'s options or in the driver:
+
+```clojure
+(qt/check counter {:traces 10 :save-failure false})       ; write nothing
+(qt/check counter {:traces 10 :save-failure "target/traces"})  ; write elsewhere
+```
+
+`qt/save-failure!` is the same step as a function, for a result you already
+have in hand — from `q/check` at the REPL, for instance. It returns the result
+with the path added at `[:failure :saved]`.
 
 ## The whole vocabulary
 
@@ -210,12 +258,14 @@ If `quint` collides with something, a driver can move all five at once with
    :state   {:pending (fn [] ...)}})          ; wins over the scan
 ```
 
-`qt/check` options: `:traces`, `:max-steps`, `:max-samples`, `:seed`. Note that
-`:max-samples` is *attempts* and `:traces` is *traces written* — Quint requires
-the former to be at least the latter, so `:traces` raises it.
+`qt/check` options: `:traces`, `:max-steps`, `:max-samples`, `:seed`,
+`:save-failure`. Note that `:max-samples` is *attempts* and `:traces` is
+*traces written* — Quint requires the former to be at least the latter, so
+`:traces` raises it.
 
-`q/replay-file` replays one committed `.itf.json` with no Quint installed,
-which is what makes a recorded failure a deterministic regression test.
+`q/replay-file` replays one committed `.itf.json` with no Quint installed, and
+`qt/replay-file` is the same thing as an assertion. That is what makes a
+recorded failure a deterministic regression test — see §6.
 
 ## Rough edges, honestly
 

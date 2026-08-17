@@ -67,7 +67,7 @@ All under `uno.michelada.quint-connect`, the Clojars group and artifact
 | `…quint-connect.report`   | pure       | Result data -> string. Diffs, step context, coverage, reproduce hints.                                                            |
 | `…quint-connect.quint`    | impure     | Build and run `quint` commands, collect the ITF files they emit.                                                                  |
 | `…quint-connect.core`     | glue       | Public API: `driver`, `defdriver`, `check`, `check-run`, `verify`, `replay-file`.                                                 |
-| `…quint-connect.test`     | glue       | `clojure.test` integration.                                                                                                       |
+| `…quint-connect.test`     | glue       | `clojure.test` integration, and the one place that writes a failing trace to disk.                                                |
 | `…quint-connect.cli`      | impure     | `-main` for generating and caching traces outside a test run (M8).                                                                |
 
 Eight namespaces, none of which application code ever loads. If one passes
@@ -308,12 +308,13 @@ of handlers the traces never exercised.
             :actual     {:balances {"alice" 50}}
             :readers    {:balances #'bank.core/accounts}
             :diff       [{...} {...} {...}]     ; clojure.data/diff
-            :cause      nil}}                   ; ex-info if the handler threw
+            :cause      nil                     ; ex-info if the handler threw
+            :saved      "test-resources/quint-connect/failures/bank-seed42-trace7.itf.json"}}
 ```
 
 The failing trace travels as JSON rather than as a filename because the
-scratch directory Quint wrote it to is deleted before `check` returns. M6 is
-what gives it a permanent home.
+scratch directory Quint wrote it to is deleted before `check` returns.
+`:saved` is where it landed afterwards — see §7.
 
 Result data is the contract. `uno.michelada.quint-connect.report` and `uno.michelada.quint-connect.test` are
 consumers of it, not producers of parallel truth. Carrying the handler and
@@ -336,6 +337,32 @@ and `verify` require the spec to track the action itself in a normal variable,
 which is what `:action-path` / `:nondet-path` are for. Documented in
 [notes/itf-format.md](notes/itf-format.md); it is why M7 is a milestone rather
 than a flag.
+
+### From a random failure to a committed trace
+
+`check` and `replay-file` are the two ends of one workflow, and the file
+between them is the whole point of generating traces at random: a trace that
+found a bug once must be able to find it again on a machine with no Quint.
+
+```
+qt/check          divergence -> save-failure! -> test-resources/quint-connect/failures/
+                                                     |  mv, by a human
+                                                     v
+qt/replay-file    test-resources/quint-connect/<spec>-seed<n>-trace<i>.itf.json
+```
+
+Two properties make this a workflow rather than a pile of files:
+
+- **The name is deterministic.** Seed and trace index identify the spec trace,
+  so re-running a failing seed rewrites one file. Nothing accumulates.
+- **The drop zone is not the archive.** `failures/` is gitignored and written
+  to on every divergence; promotion into `test-resources/quint-connect/` is a
+  `mv` a human performs. A failing test never dirties the repository, and a
+  committed trace is always one someone chose to keep.
+
+Writing the file is the only reason `uno.michelada.quint-connect.test` touches
+the filesystem, and it is why the step lives there rather than in `core`:
+`q/check` stays a function of data returning data.
 
 ## 8. Platform
 

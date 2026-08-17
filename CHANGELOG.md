@@ -6,9 +6,10 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
-Nothing is released yet. Milestones M1–M5 of
+Nothing is released yet. Milestones M1–M6 of
 [docs/roadmap.md](docs/roadmap.md) are complete: the library runs a genuine
-model-based test end to end.
+model-based test end to end, and a failure it finds becomes a committed
+regression test.
 
 ### Added
 
@@ -28,6 +29,12 @@ model-based test end to end.
 - `quint` — run the Quint CLI in a scratch directory and collect the ITF files.
 - `core` + `test` — `driver`, `defdriver`, `check`, `replay-file`, and the
   `clojure.test` bridge.
+- Failure artifacts — a divergence in `qt/check` writes the trace that caused
+  it to `test-resources/quint-connect/failures/`, verbatim, under a
+  deterministic name, and the failure message says where. `qt/save-failure!`
+  does it to a result you already hold, `:save-failure` turns it off or moves
+  it, and `qt/replay-file` asserts on a promoted trace with no Quint involved.
+  The workflow is [getting-started.md](docs/getting-started.md) §6.
 - Annotation keys are plain `:quint/*` keywords requiring no `:require`, so an
   annotated namespace takes on no dependency. A driver may move all five at
   once with `:key-ns`.

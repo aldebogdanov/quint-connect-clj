@@ -121,13 +121,21 @@ handler var, the step, the diff, and the seed to reproduce.
 
 ---
 
-## M6 — Failure artifacts
+## M6 — Failure artifacts (done)
 
 Turn a failure into a permanent regression test.
 
-- Write the failing trace to `test-resources/quint-connect/failures/`.
-- `q/replay-file` reads it back with no Quint installed.
-- Document the workflow: random failure -> committed trace -> deterministic test.
+- `qt/check` writes the failing trace to `test-resources/quint-connect/failures/`
+  — Quint's bytes verbatim, under a deterministic
+  `<spec>-seed<seed>-trace<index>.itf.json`. `qt/save-failure!` is the same step
+  as a function; `:save-failure` turns it off or moves it.
+- The drop zone is gitignored and the archive is not: promotion into
+  `test-resources/quint-connect/` is a `mv` a human performs, so a failing run
+  never dirties the repository.
+- `q/replay-file` reads it back with no Quint installed; `qt/replay-file`
+  asserts on the result.
+- The workflow is documented in [getting-started.md](getting-started.md) §6 and
+  [architecture.md](architecture.md) §7.
 
 **Done when:** the documented loop works from a cold checkout without Quint.
 

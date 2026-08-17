@@ -3,10 +3,10 @@
 Model-based testing for Clojure, driven by [Quint](https://quint-lang.org/)
 specifications.
 
-Status: **working, unreleased**. M1–M5 of
+Status: **working, unreleased**. M1–M6 of
 [docs/roadmap.md](docs/roadmap.md) are done: decoding, replay, the annotation
-registry, the Quint CLI and the public API. `bb test` runs a real model-based
-test end to end. Failure artifacts (M6) and `verify` (M7) are next.
+registry, the Quint CLI, the public API and failure artifacts. `bb test` runs a
+real model-based test end to end. `verify` (M7) is next.
 
 ## What it does
 
@@ -112,12 +112,27 @@ diverged at step 6, action "deposit"
   actual   {:balances {"alice" 12, "bob" 0}}
   in spec  {:balances {"alice" 11}}
   in app   {:balances {"alice" 12}}
+  saved      test-resources/quint-connect/failures/bank-seed42-trace0.itf.json
   reproduce  cd spec && quint run bank.qnt --mbt --seed=42 ...
 ```
 
 The handler and reader vars are the payoff of declaring the mapping next to the
 code: the failure points at the function that diverged and at the one that
 observed it. The reproduce line is pasteable.
+
+### The trace outlives the run
+
+That `saved` line is a random trace made permanent. Move it out of the
+gitignored drop zone, commit it, and name it in a test:
+
+```clojure
+(deftest deposit-is-not-off-by-one              ; the bug of 2026-08-17
+  (qt/replay-file bank "test-resources/quint-connect/bank-seed42-trace0.itf.json"))
+```
+
+That test needs no Quint, no randomness and no seed: it replays exactly the
+interleaving that broke you, in milliseconds, in CI. The workflow is
+[docs/getting-started.md](docs/getting-started.md) §6.
 
 ### About the keys
 
@@ -160,6 +175,7 @@ nobody writes by hand. `cd examples/lru && clojure -M:test`.
 ```
 src/uno/michelada/quint_connect/     library code (.clj)
 test/uno/michelada/quint_connect/    tests
+test-resources/quint-connect/        traces promoted from a failing run
 examples/lru/                        runnable example: an LRU cache
 dev/bank/                            annotated toy implementation of bank.qnt
 dev/fixtures/                        example Quint spec + recorded ITF traces

@@ -10,12 +10,14 @@
 
 (defn result-str
   "Render a `core/check` result: which trace of how many diverged, the failure
-  itself, and the command that reproduces it. Nil when the result is `:ok?`."
+  itself, where the trace was saved, and the command that reproduces it. Nil
+  when the result is `:ok?`."
   [{:keys [ok? seed traces cmd dir failure] :as result}]
   (when-not ok?
     (->> [(str "spec and implementation diverged on trace " (:trace failure)
                " of " traces ", seed " seed)
           (failure-str result)
+          (when-let [saved (:saved failure)] (str "  saved      " saved))
           (when cmd (str "  reproduce  "
                          (when dir (str "cd " dir " && "))
                          (str/join " " cmd)))]
