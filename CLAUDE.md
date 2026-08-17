@@ -51,12 +51,15 @@ Namespaces are written below by their last segment; all live under
 
 ## The annotation contract
 
-`action`, `args`, `state`, `init`, `halt` — written `:quint/action` and needing
-no `require`. That is the whole vocabulary; adding a key needs a reason from a
-real spec, not a hypothetical one.
+`action`, `args`, `state`, `init`, `halt`, `driver` — written `:quint/action`
+and needing no `require`. That is the whole vocabulary; adding a key needs a
+reason from a real spec, not a hypothetical one. `driver` was added without
+one, deliberately and on the record — see
+[docs/decisions/0009-driver-scope.md](docs/decisions/0009-driver-scope.md)
+§"The rule this was added against".
 
 - **One spelling per driver.** `quint` is the default qualifier; a driver may
-  move all five keys at once with `:key-ns`, a symbol. No per-key override, no
+  move all six keys at once with `:key-ns`, a symbol. No per-key override, no
   second accepted form within one driver, and one place in the registry that
   knows the qualifier. See
   [docs/decisions/0007-annotation-keys.md](docs/decisions/0007-annotation-keys.md).

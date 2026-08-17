@@ -53,31 +53,66 @@
   [v]
   {:fn (fn [] ((deref v))) :var v})
 
+(defn- claims
+  "The drivers an annotation names, as a set, or nil when it names none. A
+  keyword or a collection of them; nil is the ordinary case and means every
+  driver."
+  [m kd]
+  (when-some [d (get m kd)]
+    (if (coll? d) (set d) #{d})))
+
+(defn- mine?
+  "Does this var's annotation apply to the driver being built? Unscoped
+  annotations apply to all of them, which is what keeps every annotation
+  written before `:quint/driver` existed working untouched."
+  [m kd driver-name]
+  (let [only (claims m kd)]
+    (or (nil? only) (contains? only driver-name))))
+
 (defn- scan-ns
-  "Everything one namespace declares, as four vectors. `:inits` and `:halts`
-  are vectors rather than single entries so that two vars claiming the same
-  lifecycle role can be counted and rejected, here or across the scan."
-  [key-ns ns-sym]
+  "Everything one namespace declares for this driver, as four vectors.
+
+  `:inits` and `:halts` are vectors rather than single entries so that two vars
+  claiming the same lifecycle role can be counted and rejected, here or across
+  the scan. Vars scoped to another driver by `:quint/driver` are dropped before
+  that counting, which is the whole point of the key: two inits for two
+  different specs are not a collision, and two for the same one still are."
+  [key-ns driver-name ns-sym]
   (require ns-sym)
-  (let [[ka kg ks ki kh] (map #(annotation-key key-ns %) [:action :args :state :init :halt])
-        found (reduce
-               (fn [acc [_ v]]
-                 (let [m (var-meta v)]
-                   (cond-> acc
-                     (contains? m ka) (update :actions conj [(get m ka) (action-handler v m kg)])
-                     (contains? m ks) (update :readers conj (reader v (get m ks)))
-                     (get m ki)       (update :inits conj (lifecycle v))
-                     (get m kh)       (update :halts conj (lifecycle v)))))
-               {:actions [] :readers [] :inits [] :halts []}
-               (ns-interns ns-sym))]
-    (when (every? empty? (vals found))
+  (let [[ka kg ks ki kh kd]
+        (map #(annotation-key key-ns %) [:action :args :state :init :halt :driver])
+
+        annotated (filter (fn [[_ v]]
+                            (let [m (var-meta v)]
+                              (or (contains? m ka) (contains? m ks)
+                                  (get m ki) (get m kh))))
+                          (ns-interns ns-sym))]
+    (when (empty? annotated)
       (fail :empty-scan
             (str ns-sym " is in :scan but carries no " key-ns "/* annotations."
                  " The usual cause is metadata on the (defn ...) form, which"
                  " Clojure discards: write (defn ^{...} name ...) or"
                  " (defn name {...} ...) instead.")
             {:ns ns-sym :key-ns key-ns}))
-    found))
+    ;; A scoped annotation asks a question an unnamed driver cannot answer, and
+    ;; guessing it either way is the silence this design refuses.
+    (when (nil? driver-name)
+      (when-let [scoped (seq (keep (fn [[_ v]] (when (get (var-meta v) kd) v)) annotated))]
+        (fail :unnamed-driver
+              (str (first scoped) " is scoped with " (annotation-key key-ns :driver)
+                   " but this driver has no :name, so there is nothing to match"
+                   " it against. Give the driver map a :name, or drop the scope.")
+              {:ns ns-sym :vars (vec scoped) :key-ns key-ns})))
+    (reduce
+     (fn [acc [_ v]]
+       (let [m (var-meta v)]
+         (cond-> acc
+           (contains? m ka) (update :actions conj [(get m ka) (action-handler v m kg)])
+           (contains? m ks) (update :readers conj (reader v (get m ks)))
+           (get m ki)       (update :inits conj (lifecycle v))
+           (get m kh)       (update :halts conj (lifecycle v)))))
+     {:actions [] :readers [] :inits [] :halts []}
+     (filter (fn [[_ v]] (mine? (var-meta v) kd driver-name)) annotated))))
 
 (defn- no-duplicates! [error what pairs]
   (doseq [[k group] (group-by first pairs)
@@ -117,16 +152,22 @@
   under the qualifier in `:key-ns`, a symbol defaulting to `quint`. Explicit
   `:actions` and `:state` in the map are merged on top and win.
 
+  `:name` names this driver, and only matters when a scanned namespace serves
+  more than one: a var annotated `:quint/driver :ledger` is read by the driver
+  named `:ledger` and ignored by the others, while an unannotated var is read
+  by all of them. A scoped annotation with no `:name` to match is
+  `:unnamed-driver`.
+
   Returns the map `replay/run-trace` consumes — `:actions`, `:readers`,
   `:init`, `:halt`, `:ignore`, `:compare` — with the remaining keys of the
   driver map (`:spec`, `:main`, `:init-action`, `:step-action`, `:action-path`,
   `:nondet-path`, `:key-fn`, …) passed through untouched for the caller.
 
-  Throws `ex-info` with `:quint/error` `:empty-scan`, `:duplicate-action`,
-  `:duplicate-state`, `:duplicate-init`, `:duplicate-halt` or
-  `:ambiguous-arity`."
-  [{:keys [scan key-ns actions state] :or {key-ns 'quint} :as m}]
-  (let [scanned    (map #(scan-ns key-ns %) scan)
+  Throws `ex-info` with `:quint/error` `:empty-scan`, `:unnamed-driver`,
+  `:duplicate-action`, `:duplicate-state`, `:duplicate-init`,
+  `:duplicate-halt` or `:ambiguous-arity`."
+  [{:keys [scan key-ns actions state] driver-name :name :or {key-ns 'quint} :as m}]
+  (let [scanned    (map #(scan-ns key-ns driver-name %) scan)
         act-pairs  (mapcat :actions scanned)
         readers    (mapcat :readers scanned)
         overridden (set (keys state))]

@@ -74,7 +74,7 @@ its classpath.
  :aliases
  {:test {:extra-paths ["test"]
          :extra-deps  {org.clojars.aldebogdanov/quint-connect
-                       {:mvn/version "0.2.0"}
+                       {:mvn/version "0.3.0"}
 
                        io.github.cognitect-labs/test-runner
                        {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
@@ -336,7 +336,8 @@ Two things to know before you reach for it:
 
 ## The whole vocabulary
 
-Five keys, qualified by `quint`, requiring nothing.
+Six keys, qualified by `quint`, requiring nothing. The first five are the ones
+you use; `:quint/driver` only matters when one namespace serves two specs.
 
 | annotation | goes on | means |
 | ---------- | ------- | ----- |
@@ -347,8 +348,9 @@ Five keys, qualified by `quint`, requiring nothing.
 | `{:quint/state :*}` | a getter function | supplies a whole map of variables |
 | `{:quint/init true}` | a function | reset the app; runs once per trace |
 | `{:quint/halt true}` | a function | stop it; runs after every trace |
+| `{:quint/driver :ledger}` | any annotated var | only this driver reads it; absent means all of them |
 
-If `quint` collides with something, a driver can move all five at once with
+If `quint` collides with something, a driver can move all six at once with
 `:key-ns 'acme.mbt`. See
 [decisions/0007-annotation-keys.md](decisions/0007-annotation-keys.md).
 
@@ -358,6 +360,7 @@ If `quint` collides with something, a driver can move all five at once with
 (q/defdriver counter
   {:spec    "spec/counter.qnt"
    :main    "counterTest"                     ; --main module, when needed
+   :name    :counter                          ; only needed with :quint/driver
    :scan    '[myapp.core myapp.model-test]
    :ignore  #{:lastOp}                        ; variables not compared
    :compare {:count (fn [expected actual] ...)}
@@ -380,7 +383,7 @@ recorded failure a deterministic regression test — see §6.
 
 ## Rough edges, honestly
 
-- **0.2.0 is an early release.** The API is the one described here and is not
+- **0.3.0 is an early release.** The API is the one described here and is not
   expected to move, but nothing has been used in anger by anyone but its
   author. The license is [EPL-2.0](../LICENSE), the same as Clojure's.
 - **`:missing-state` is not implemented.** A spec variable that no reader

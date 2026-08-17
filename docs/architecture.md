@@ -109,6 +109,7 @@ mechanics, all verified against Clojure 1.12.5 by
 | `{:quint/state :*}`                           | function var / `IDeref` var | supplies a whole map of spec variables, merged                                      |
 | `{:quint/init true}`                          | function var                | start or reset the application; run once per trace, before step 0                   |
 | `{:quint/halt true}`                          | function var                | stop it; run after every trace, in a `finally`                                      |
+| `{:quint/driver :ledger}`                     | any annotated var           | scope it to the driver(s) named; absent means every driver                          |
 
 Keys are qualified by `quint` and require nothing
 ([decisions/0007-annotation-keys.md](decisions/0007-annotation-keys.md)):
@@ -123,7 +124,7 @@ That an annotated namespace pulls in nothing is the point: this library belongs
 in a `:test` alias, and an annotation must never be able to drag it onto a
 production classpath.
 
-`quint` is a shared keyword namespace, so a driver can move all five keys at
+`quint` is a shared keyword namespace, so a driver can move all six keys at
 once with `:key-ns`, a symbol — `{:key-ns 'acme.mbt}` reads `:acme.mbt/action`
 and friends. One qualifier per driver, no per-key override. The registry is
 parameterised on it in exactly one place.
@@ -301,6 +302,9 @@ downstream of the registry knows that metadata exists.
   option here: the loser would never run, and an `init` that never runs
   reappears as a divergence in a later trace that has nothing to do with it.
 - `:ambiguous-arity` — multi-arity var without `:quint/args`.
+- `:unnamed-driver` — a var scoped with `:quint/driver` in a driver that has no
+  `:name` to match it against. See
+  [0009](decisions/0009-driver-scope.md).
 
 At replay time, because each of these needs the trace: `:no-init` (it starts
 with an action nothing is annotated for), `:unknown-action`,
@@ -442,8 +446,8 @@ The keywords:
 :quint-not-found  :quint-failed  :no-traces  :test-failed  :bad-itf
 :bad-decode-path  :name-collision  :empty-scan  :duplicate-action
 :duplicate-state  :duplicate-init  :duplicate-halt  :ambiguous-arity
-:no-init  :unknown-action  :anonymous-action  :state-read-failed
-:save-failed
+:unnamed-driver  :no-init  :unknown-action  :anonymous-action
+:state-read-failed  :save-failed
 ```
 
 That list is the whole set, and it is checked against the source rather than

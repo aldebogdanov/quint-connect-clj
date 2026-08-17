@@ -6,7 +6,33 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
-Nothing since 0.2.0.
+Nothing since 0.3.0.
+
+## [0.3.0] — 2026-08-18
+
+### Added
+
+- `:quint/driver` — a sixth annotation key, scoping an annotation to named
+  drivers, with `:name` in the driver map to match it against. One namespace
+  can now serve two specs that each want their own `init`, which was
+  `:duplicate-init` before. A keyword or a set; **absent means every driver**,
+  so nothing written before this changes. It moves with `:key-ns` like the
+  other five, and scoping happens before duplicate detection — two inits for
+  two drivers are not a collision, two for the same one still are.
+- `:unnamed-driver` — a scoped annotation in a driver with no `:name`. The
+  question it asks has no answer, and guessing either way is silent.
+
+  This key was added **without** the real spec [CLAUDE.md](CLAUDE.md) asks for.
+  That is deliberate and recorded in
+  [0009](docs/decisions/0009-driver-scope.md) §"The rule this was added
+  against", including the risk taken.
+
+### Changed
+
+- `:empty-scan` now means "no annotations at all" rather than "nothing for this
+  driver". A namespace whose annotations are all scoped to other drivers is
+  legitimately empty for this one and is no longer reported as the
+  `^{...} (defn ...)` trap.
 
 ## [0.2.0] — 2026-08-18
 

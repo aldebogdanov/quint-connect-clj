@@ -6,7 +6,8 @@
             [org.clojars.aldebogdanov.quint-connect.replay :as replay]
             [org.clojars.aldebogdanov.quint-connect.fixtures.bank :as bank]
             [org.clojars.aldebogdanov.quint-connect.fixtures.forms :as forms]
-            [org.clojars.aldebogdanov.quint-connect.fixtures.restart :as restart]))
+            [org.clojars.aldebogdanov.quint-connect.fixtures.restart :as restart]
+            [org.clojars.aldebogdanov.quint-connect.fixtures.two-specs :as two-specs]))
 
 (defn- fixture
   "A fixture namespace, by its last segment. The full names run to 47
@@ -190,3 +191,54 @@
   (let [a (registry/resolve-driver {:scan [(fixture :bank)]})
         b (registry/resolve-driver {:scan [(fixture :bank)]})]
     (is (not (identical? (:actions a) (:actions b))))))
+
+;; --- :quint/driver, when one namespace serves two specs --------------------
+
+(deftest driver-scope-splits-a-shared-namespace
+  (testing "each driver gets its own init"
+    (let [l (registry/resolve-driver {:name :ledger :scan [(fixture :two-specs)]})
+          c (registry/resolve-driver {:name :cache  :scan [(fixture :two-specs)]})]
+      (is (= #'two-specs/open-ledger! (get-in l [:init :var])))
+      (is (= #'two-specs/open-cache!  (get-in c [:init :var])))))
+
+  (testing "an unscoped annotation belongs to both"
+    (doseq [n [:ledger :cache]]
+      (let [d (registry/resolve-driver {:name n :scan [(fixture :two-specs)]})]
+        (is (contains? (:actions d) "audit")
+            "unannotated vars keep working, which is what makes the key optional"))))
+
+  (testing "and a set names several"
+    (doseq [n [:ledger :cache]]
+      (is (contains? (:actions (registry/resolve-driver
+                                {:name n :scan [(fixture :two-specs)]}))
+                     "post")))))
+
+(deftest driver-scope-is-what-stops-it-being-a-duplicate
+  ;; The same namespace, asked for a driver neither init claims: both are
+  ;; filtered out, so there is no init at all rather than a collision.
+  (let [d (registry/resolve-driver {:name :neither :scan [(fixture :two-specs)]})]
+    (is (nil? (:init d)))
+    (is (contains? (:actions d) "audit") "the unscoped ones still arrive")))
+
+(deftest a-scoped-annotation-without-a-driver-name-is-rejected
+  ;; Silently ignoring the scope would pick an init by accident, which is the
+  ;; failure mode this whole layer exists to prevent.
+  (let [e (try (registry/resolve-driver {:scan [(fixture :two-specs)]})
+               (catch clojure.lang.ExceptionInfo ex ex))]
+    (is (= :unnamed-driver (:quint/error (ex-data e))))
+    (is (str/includes? (ex-message e) ":name"))
+    (is (str/includes? (ex-message e) ":quint/driver"))))
+
+(deftest scoping-does-not-mask-a-real-duplicate
+  ;; Two inits that both claim the same driver are still a collision.
+  (is (= :duplicate-init
+         (error-of #(registry/resolve-driver
+                     {:name :bank
+                      :scan [(fixture :bank) (fixture :restart)]})))))
+
+(deftest driver-scope-follows-key-ns
+  ;; The sixth key moves with the other five, or it would be the per-key
+  ;; override 0007 refused.
+  (is (= :unnamed-driver
+         (error-of #(registry/resolve-driver
+                     {:scan [(fixture :two-specs-keyed)] :key-ns 'acme.mbt})))))

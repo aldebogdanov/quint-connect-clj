@@ -3,7 +3,7 @@
 Model-based testing for Clojure, driven by [Quint](https://quint-lang.org/)
 specifications.
 
-Status: **0.2.0**. Every planned milestone in
+Status: **0.3.0**. Every planned milestone in
 [docs/roadmap.md](docs/roadmap.md) is done — decoding, replay, the annotation
 registry, the Quint CLI, the public API, failure artifacts, scripted runs and
 `verify`. `bb test` runs a real model-based test end to end, needing no Quint.
@@ -32,7 +32,7 @@ no return-value convention, no require. This is the Clojure counterpart of
 
 ```clojure
 ;; belongs in a :test alias and nowhere else
-org.clojars.aldebogdanov/quint-connect {:mvn/version "0.2.0"}
+org.clojars.aldebogdanov/quint-connect {:mvn/version "0.3.0"}
 ```
 
 ## Usage
@@ -140,7 +140,20 @@ interleaving that broke you, in milliseconds, in CI. The workflow is
 ### About the keys
 
 Five keys, qualified by `quint`, requiring nothing: `:quint/action`,
-`:quint/args`, `:quint/state`, `:quint/init`, `:quint/halt`.
+`:quint/args`, `:quint/state`, `:quint/init`, `:quint/halt`. A sixth,
+`:quint/driver`, exists only for the case where one namespace serves two specs
+and each wants its own lifecycle:
+
+```clojure
+(defn open-ledger! {:quint/init true :quint/driver :ledger} [] ...)
+(defn open-cache!  {:quint/init true :quint/driver :cache}  [] ...)
+
+(q/defdriver ledger {:name :ledger :spec "spec/ledger.qnt" :scan '[app.system]})
+```
+
+An annotation without it belongs to every driver, so you can ignore the key
+until you need it. See
+[docs/decisions/0009-driver-scope.md](docs/decisions/0009-driver-scope.md).
 
 `quint` is a shared keyword namespace and the Quint project's name, not ours,
 so a driver can move the whole vocabulary out of the way:
@@ -152,7 +165,7 @@ so a driver can move the whole vocabulary out of the way:
    :key-ns 'acme.mbt})          ; now reads :acme.mbt/action, :acme.mbt/state, …
 ```
 
-`:key-ns` moves all five keys together; there is no per-key override and no
+`:key-ns` moves all six keys together; there is no per-key override and no
 second spelling within one driver. Note the sharp edge: if you set `:key-ns`
 and leave an annotation on `:quint/*`, nothing reads it and nothing warns you,
 unless the whole namespace scans empty. See
