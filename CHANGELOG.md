@@ -6,10 +6,17 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
-Nothing is released yet. Milestones M1–M6 and M7a of
-[docs/roadmap.md](docs/roadmap.md) are complete: the library runs a genuine
-model-based test end to end, a failure it finds becomes a committed regression
-test, and a scripted Quint `run` drives the implementation too.
+Nothing since 0.1.0.
+
+## [0.1.0] — 2026-08-18
+
+First release, as `org.clojars.aldebogdanov/quint-connect`. Milestones M1–M6
+and M7a of [docs/roadmap.md](docs/roadmap.md) are complete: the library runs a
+genuine model-based test end to end, a failure it finds becomes a committed
+regression test, and a scripted Quint `run` drives the implementation too.
+
+`verify` (M7b) is **not** in this release; the mode is designed and its
+behaviour recorded, but unbuilt. See "Known gaps" below before filing anything.
 
 ### Added
 

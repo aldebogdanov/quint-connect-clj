@@ -3,10 +3,12 @@
 Model-based testing for Clojure, driven by [Quint](https://quint-lang.org/)
 specifications.
 
-Status: **working, unreleased**. M1–M6 and M7a of
-[docs/roadmap.md](docs/roadmap.md) are done: decoding, replay, the annotation
-registry, the Quint CLI, the public API, failure artifacts and scripted runs.
-`bb test` runs a real model-based test end to end. `verify` (M7b) is next.
+Status: **0.1.0**. M1–M6 and M7a of [docs/roadmap.md](docs/roadmap.md) are
+done: decoding, replay, the annotation registry, the Quint CLI, the public API,
+failure artifacts and scripted runs. `bb test` runs a real model-based test end
+to end. `verify` (M7b) is next and is **not** in this release — read
+[Rough edges, honestly](docs/getting-started.md#rough-edges-honestly) before
+depending on it.
 
 ## What it does
 
@@ -29,8 +31,8 @@ no return-value convention, no require. This is the Clojure counterpart of
 ## Coordinates
 
 ```clojure
-;; Clojars, not released yet
-org.clojars.aldebogdanov/quint-connect {:mvn/version "…"}
+;; belongs in a :test alias and nowhere else
+org.clojars.aldebogdanov/quint-connect {:mvn/version "0.1.0"}
 ```
 
 ## Usage

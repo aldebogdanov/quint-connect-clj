@@ -63,8 +63,9 @@ quint run spec/counter.qnt --max-steps=4 --verbosity=0
 
 ## 2. Declare the dependency
 
-`deps.edn`. quint-connect is not on Clojars yet, so use `:local/root` (or a
-`:git/url` coordinate). It belongs in a **test** alias and nowhere else.
+`deps.edn`. It belongs in a **test** alias and nowhere else — the annotations
+in your application are inert keywords, so nothing in production needs this on
+its classpath.
 
 ```clojure
 {:paths ["src"]
@@ -73,7 +74,7 @@ quint run spec/counter.qnt --max-steps=4 --verbosity=0
  :aliases
  {:test {:extra-paths ["test"]
          :extra-deps  {org.clojars.aldebogdanov/quint-connect
-                       {:local/root "../quint-connect-clj"}
+                       {:mvn/version "0.1.0"}
 
                        io.github.cognitect-labs/test-runner
                        {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
@@ -336,8 +337,9 @@ recorded failure a deterministic regression test — see §6.
 
 ## Rough edges, honestly
 
-- **Not released.** No Clojars artifact yet; use `:local/root` or `:git/url`.
-  The license is [EPL-2.0](../LICENSE), the same as Clojure's.
+- **0.1.0 is a first release.** The API is the one described here and is not
+  expected to move, but nothing has been used in anger by anyone but its
+  author. The license is [EPL-2.0](../LICENSE), the same as Clojure's.
 - **`:missing-state` is not implemented.** A spec variable that no reader
   supplies shows up as a diff against nothing rather than a clear error. The
   driver never reads the spec, so the first trace is what reveals it.

@@ -5,6 +5,15 @@
   test:all {:doc  "Run every test, including those that shell out to quint"
             :task (shell "clojure -M:test")}
 
+  jar      {:doc  "Build the library jar into target/"
+            :task (shell "clojure -T:build jar")}
+
+  install  {:doc  "Install the jar into the local ~/.m2"
+            :task (shell "clojure -T:build install")}
+
+  deploy   {:doc  "Publish to Clojars; needs CLOJARS_USERNAME and a deploy token in CLOJARS_PASSWORD"
+            :task (shell "clojure -T:build deploy")}
+
   fixtures {:doc  "Regenerate the ITF fixtures that have a fixed seed"
             :task (do
                     (shell {:dir "dev/fixtures"}
