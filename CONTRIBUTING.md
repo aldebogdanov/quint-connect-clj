@@ -21,6 +21,19 @@ a fresh clone, that is a bug — please report it.
 
 `bb test:all` additionally shells out to the real `quint`
 (`npm i -g @informalsystems/quint`). Those tests are tagged `^:integration`.
+`bb test:verify` runs Apalache and takes minutes; those are `^:slow` and are
+excluded from both of the above.
+
+The projects under `examples/` depend on the **released** coordinate, so that
+they can be copied out and run as-is. When you change the library, run them
+against your working tree instead:
+
+```
+cd examples/counter && clojure -M:test:local
+```
+
+CI does exactly that. An example run without `:local` tests the last release
+and says nothing about your commit.
 
 ## Before opening a pull request
 

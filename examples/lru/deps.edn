@@ -3,8 +3,14 @@
 
  :aliases
  {:test {:extra-paths ["test"]
-         :extra-deps  {org.clojars.aldebogdanov/quint-connect {:local/root "../.."}
+         :extra-deps  {org.clojars.aldebogdanov/quint-connect {:mvn/version "0.3.0"}
 
                        io.github.cognitect-labs/test-runner
                        {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
-         :main-opts   ["-m" "cognitect.test-runner"]}}}
+         :main-opts   ["-m" "cognitect.test-runner"]}
+
+  ;; Only for this repository: test the working tree instead of the release,
+  ;; with `clojure -M:test:local`. Copying this example elsewhere means
+  ;; dropping this alias — `clojure -M:test` is the real entry point.
+  :local {:override-deps {org.clojars.aldebogdanov/quint-connect
+                          {:local/root "../.."}}}}}

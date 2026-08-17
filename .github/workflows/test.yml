@@ -71,11 +71,15 @@ jobs:
 
       - run: bb test:all
 
-      - run: cd examples/counter && clojure -M:test
-      - run: cd examples/lru && clojure -M:test
-      - run: cd examples/queue && clojure -M:test
+      # The examples depend on the released coordinate so they can be copied
+      # and run as-is. `:local` overrides that to the working tree, which is
+      # what CI must test — otherwise a regression here would pass against the
+      # last release and say nothing about this commit.
+      - run: cd examples/counter && clojure -M:test:local
+      - run: cd examples/lru && clojure -M:test:local
+      - run: cd examples/queue && clojure -M:test:local
       # tokens has ^:slow verify tests; -e :slow keeps Apalache out of CI.
-      - run: cd examples/tokens && clojure -M:test -e :slow
+      - run: cd examples/tokens && clojure -M:test:local -e :slow
 
   # Apalache: downloaded on first use and minutes per run, so it is not on the
   # path of an ordinary pull request. Run it by hand before a release.
