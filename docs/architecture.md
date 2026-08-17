@@ -283,8 +283,11 @@ downstream of the registry knows that metadata exists.
 
 - `:empty-scan` — a namespace in `:scan` yielded no annotations. Almost always
   the `^{...} (defn ...)` trap; the message says so.
-- `:duplicate-action`, `:duplicate-state` — two vars claim the same name and
-  neither is overridden.
+- `:duplicate-action`, `:duplicate-state` — two vars claim the same name. A
+  driver-map `:actions` or `:state` entry replacing one of them does **not**
+  suppress this. The annotations are still ambiguous, and quietly picking a
+  winner is the failure this layer exists to prevent; the override says which
+  function to call, not which of two declarations was meant.
 - `:duplicate-init`, `:duplicate-halt` — two vars claim the same lifecycle
   role, in one namespace or across the `:scan`. First-one-wins is not an
   option here: the loser would never run, and an `init` that never runs
