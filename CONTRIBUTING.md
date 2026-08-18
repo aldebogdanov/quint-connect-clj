@@ -50,6 +50,11 @@ cd examples/counter && clojure -M:test:local
 CI does exactly that. An example run without `:local` tests the last release
 and says nothing about your commit.
 
+Each example also has a `:broken` alias holding deliberately-failing tests, for
+showing what a divergence reads like. They are tagged `^:broken`, excluded from
+`clojure -M:test`, and CI never runs them — a green example suite means the
+passing tests passed, not that the broken ones were skipped by accident.
+
 ## Before opening a pull request
 
 - **One milestone, one change set.** See [docs/roadmap.md](docs/roadmap.md).
@@ -91,9 +96,12 @@ These are the ones people trip on. The full set is in
 
 ## The annotation vocabulary is closed
 
-`action`, `args`, `state`, `init`, `halt`. Adding a key needs a reason from a
-real specification, not a hypothetical one. Anything that cannot be said in one
-annotation on one var belongs in `:actions` or `:state` as a plain function.
+`action`, `args`, `state`, `init`, `halt`, `driver`. Adding a key needs a
+reason from a real specification, not a hypothetical one — `driver` was added
+without one, deliberately and on the record, and
+[0009](docs/decisions/0009-driver-scope.md) says so rather than pretending
+otherwise. Anything that cannot be said in one annotation on one var belongs in
+`:actions` or `:state` as a plain function.
 
 ## Proposing something larger
 

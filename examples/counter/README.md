@@ -26,6 +26,17 @@ stops working the other is wrong too, and running this is how anyone finds out.
 
 ## Seeing it fail
 
+The broken version ships with the example, so you do not have to edit anything:
+
+```bash
+clojure -M:test:broken
+```
+
+Those tests are tagged `^:broken`, excluded from `clojure -M:test`, and are
+*supposed* to fail. The point is the message.
+
+## Seeing it fail
+
 Make `refuse` change the count, which is the bug the document walks through:
 
 ```clojure

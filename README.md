@@ -190,6 +190,13 @@ replaying committed ones:
 cd examples/counter && clojure -M:test
 ```
 
+Every example also ships the broken version of itself, so you can see what a
+failure reads like without editing anything:
+
+```bash
+cd examples/lru && clojure -M:test:broken     # fails, on purpose
+```
+
 They depend on the released coordinate, so a copied directory runs unchanged.
 Working on the library itself? `clojure -M:test:local` swaps in the working
 tree — see [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -29,6 +29,17 @@ only then is there a counterexample to replay.
 That distinction is worth internalising before you reach for it, and this
 example is built to make it concrete.
 
+## Seeing it fail
+
+The broken version ships with the example, so you do not have to edit anything:
+
+```bash
+clojure -M:test:broken
+```
+
+Those tests are tagged `^:broken`, excluded from `clojure -M:test`, and are
+*supposed* to fail. The point is the message.
+
 ## Break the implementation
 
 Drop the `min` in [src/bucket/core.clj](src/bucket/core.clj), which is how this

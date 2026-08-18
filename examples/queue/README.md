@@ -82,6 +82,17 @@ is the cheapest place to find out. It is the same shape of silence as a
 stranded `:key-ns`, and it is written down in
 [docs/decisions/0009-driver-scope.md](../../docs/decisions/0009-driver-scope.md).
 
+## Seeing it fail
+
+The broken version ships with the example, so you do not have to edit anything:
+
+```bash
+clojure -M:test:broken
+```
+
+Those tests are tagged `^:broken`, excluded from `clojure -M:test`, and are
+*supposed* to fail. The point is the message.
+
 ## What to look at
 
 - [spec/queue.qnt](spec/queue.qnt) — one `queue` module, two instantiations.

@@ -10,6 +10,17 @@ generates its traces rather than replaying committed ones.
 clojure -M:test
 ```
 
+## Seeing it fail
+
+The broken version ships with the example, so you do not have to edit anything:
+
+```bash
+clojure -M:test:broken
+```
+
+Those tests are tagged `^:broken`, excluded from `clojure -M:test`, and are
+*supposed* to fail. The point is the message.
+
 ## The demo
 
 The interesting rule is in [spec/lru.qnt](spec/lru.qnt): *reading* a key makes
