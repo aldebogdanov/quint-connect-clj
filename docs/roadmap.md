@@ -19,8 +19,10 @@ No library code.
 Pure ITF JSON -> EDN.
 
 - Decode `#bigint`, `#map`, `#set`, `#tup`, records and sum types
-  (`{tag, value}`). `#unserializable` is deferred to M7: Quint's writer never
-  emits it, only its reader accepts it, so no recording exists to test against.
+  (`{tag, value}`). `#unserializable` is deferred: Quint's writer never emits
+  it, only its reader accepts it, so no recording exists to test against. M7b
+  was expected to settle this and did — Apalache's counterexamples carry none
+  either, so it is deferred indefinitely rather than to a milestone.
 - Unwrap `Some`/`None` **only** inside `mbt::nondetPicks`, where Quint's own
   runtime puts it regardless of what the spec declares; `None` drops the key.
   Those tags in an ordinary state variable are a type the spec declared itself
@@ -74,7 +76,9 @@ The reflective layer, and the reason the project has the shape it has. It turns
 - `require` each namespace in `:scan`, read `ns-interns`, collect annotations
   from the var and, for `IReference` values, from the object too.
 - Read the qualifier from the driver's `:key-ns` (a symbol, default `quint`),
-  in one place. All five keys move together; there is no per-key override.
+  in one place. All keys move together; there is no per-key override. M3
+  shipped five of them; `:quint/driver` joined the set later, in
+  [decisions/0009-driver-scope.md](decisions/0009-driver-scope.md).
 - `:quint/action` -> handler, picks bound positionally from `:arglists`;
   `:quint/args` overrides; multi-arity without it is `:ambiguous-arity`.
 - `:quint/state` on a function var (called with no arguments) and on an

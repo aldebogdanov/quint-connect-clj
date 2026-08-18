@@ -253,7 +253,7 @@ touch application code.
 
    ;; --- where the annotations are ---------------------------------------
    :scan     '[bank.core bank.system bank.model-test]   ; required'd, then read
-   :key-ns   'quint                         ; qualifier for all five keys
+   :key-ns   'quint                         ; qualifier for all six keys
 
    ;; --- complex cases: merged over whatever :scan found, and winning -----
    :actions  {"transfer" (fn [{:keys [from to amount]}] ...)}   ; picks map

@@ -7,8 +7,12 @@
 (def ^:private action-var "mbt::actionTaken")
 (def ^:private picks-var "mbt::nondetPicks")
 
-;; `#unserializable` is absent on purpose: Quint's writer never emits it, so
-;; there is no recording to test against until Apalache traces arrive in M7.
+;; `#unserializable` is absent on purpose, and stayed absent through M7b. The
+;; Apalache traces that milestone was waiting for arrived and carried none of
+;; it: Quint's writer never emits it, Apalache's counterexamples have not been
+;; seen to either, and only the ITF *reader* side of both accepts it. So there
+;; is still nothing to decode against, and a fixture that looks about right is
+;; not an option here — see CONTRIBUTING, "Fixtures are recordings".
 (def ^:private known-tags #{"#bigint" "#set" "#tup" "#map"})
 
 (defn- fail [error msg data]
@@ -62,7 +66,12 @@
         (fail :bad-itf
               (str "unsupported ITF encoding " (pr-str (first unknown))
                    (when (= "#unserializable" (first unknown))
-                     " — emitted by Apalache, not by Quint; supported in M7"))
+                     (str " — it is in the ITF specification, but no Quint or"
+                          " Apalache output has been observed emitting one, so"
+                          " there is nothing to decode it against. A trace that"
+                          " carries one is exactly what would fix that: please"
+                          " open an issue with it at "
+                          "https://github.com/aldebogdanov/quint-connect-clj/issues")))
               {:value v :supported known-tags})
 
         (contains? v "#bigint") (decode-bigint (get v "#bigint"))

@@ -35,7 +35,9 @@ A driver may move the whole vocabulary to a namespace of its own choosing with
    :key-ns 'acme.mbt})          ; now reads :acme.mbt/action, :acme.mbt/state, …
 ```
 
-`:key-ns` moves all five keys together. There is no per-key override and no
+`:key-ns` moves all six keys together — five when this was written, plus
+`:quint/driver` from [0009](0009-driver-scope.md), which joined the set on the
+terms this ADR set out. There is no per-key override and no
 second accepted spelling within one driver.
 
 ## Why this reverses 0006
