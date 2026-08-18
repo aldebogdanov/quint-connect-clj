@@ -179,8 +179,8 @@ working cross-file import could be built to test it either way. If M7b runs
 
 ## Large integers: a real trap
 
-On the **default rust backend**, integers with absolute value `>= 10^15` are
-serialized as bignumber.js internals instead of `#bigint`:
+With the **default `--backend=rust`**, integers with absolute value `>= 10^15`
+come out as bignumber.js internals instead of `#bigint`:
 
 ```json
 "unsafe": {"s": {"#bigint": "1"},
@@ -189,9 +189,26 @@ serialized as bignumber.js internals instead of `#bigint`:
 ```
 
 That is `9007199254740993`. The threshold is exact: `999999999999999` encodes
-correctly, `1000000000000000` does not. The `typescript` backend encodes both
+correctly, `1000000000000000` does not. `--backend=typescript` encodes both
 correctly as `{"#bigint": "..."}`. Fixtures: `bigint_rust_0.itf.json`,
 `bigint_typescript_0.itf.json`.
+
+**A JavaScript library in a Rust backend is not a contradiction, and the
+attribution above used to imply it was.** What is recorded here is only which
+`--backend` value produces which bytes. The `rust` backend is a separate
+binary — `~/.quint/rust-evaluator-v0.6.0/quint_evaluator` — that evaluates the
+spec, but `quint` itself is a TypeScript program and the ITF file is written by
+it, not by the evaluator. So the leak is on Quint's own side of that boundary,
+where integers are bignumber.js objects and the writer evidently special-cases
+them to `#bigint` only on the path the typescript backend takes.
+
+That last sentence is **inference**, not a recording: the observed facts are
+the table of encodings and the reconstruction rule below. The mechanism was not
+read out of Quint's source and should not be repeated as though it were.
+
+That the shape is bignumber.js *is* verified, by reconstruction rather than by
+assertion: `c` is an array of base-1e14 limbs, which is that library's internal
+layout and reassembles every fixture value exactly.
 
 Reconstruction rule, verified against all three fixture values:
 
@@ -200,9 +217,9 @@ digits = c[0] ++ (each later chunk left-padded with zeros to 14 characters)
 value  = s * digits * 10^(e + 1 - (count digits))
 ```
 
-Also on the rust backend, a large *negative* literal (`-12345678901234567890`)
-fails at runtime with `error: Runtime error`; the typescript backend evaluates
-it fine.
+Also with `--backend=rust`, a large *negative* literal
+(`-12345678901234567890`) fails at runtime with `error: Runtime error`;
+`--backend=typescript` evaluates it fine.
 
 Decisions for M1: decode the `{s, e, c}` form as well as `#bigint`, add these
 fixtures to the suite, and report the quirk upstream. Do not silently switch

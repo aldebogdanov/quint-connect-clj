@@ -13,7 +13,7 @@ the commands in [../../docs/notes/itf-format.md](../../docs/notes/itf-format.md)
 | `tracked_test_depositThenOverdraftTest.itf.json` | `quint test` — no `mbt::`, so `:action-path` is the only way it drives anything |
 | `tracked_run_0.itf.json`                    | `quint run --mbt` of the same spec — carries both mechanisms, which is what proves they agree |
 | `shapes.qnt`, `shapes_0.itf.json`           | one instance of every ITF value encoding, lists included  |
-| `bigint.qnt`, `bigint_rust_0.itf.json`      | large-integer serialization quirk on the rust backend     |
+| `bigint.qnt`, `bigint_rust_0.itf.json`      | large-integer serialization quirk under `--backend=rust`  |
 | `bigint_typescript_0.itf.json`              | the same spec, encoded correctly by the typescript backend |
 | `collide.qnt`, `collide_0.itf.json`         | one module instantiated twice, so two variables end in `::n` — decodes only with a `:key-fn` |
 

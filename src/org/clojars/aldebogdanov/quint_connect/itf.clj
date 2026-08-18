@@ -40,8 +40,10 @@
          (every? #(and (map? %) (contains? % "#bigint")) c))))
 
 (defn- decode-bignumber
-  "The {s, e, c} form the rust backend leaks for |n| >= 10^15. Rule and
-  verification: docs/notes/itf-format.md §\"Large integers\"."
+  "The {s, e, c} form Quint writes for |n| >= 10^15 under --backend=rust: the
+  internals of a bignumber.js object, leaked by its ITF writer rather than by
+  the Rust evaluator. Rule and verification: docs/notes/itf-format.md
+  §\"Large integers\"."
   [m]
   (let [sign   (decode-bigint (get-in m ["s" "#bigint"]))
         exp    (decode-bigint (get-in m ["e" "#bigint"]))
