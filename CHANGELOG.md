@@ -6,7 +6,24 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
-Nothing since 0.5.0.
+### Fixed
+
+- **`quint/exec` could deadlock.** Both of a subprocess's streams are pipes,
+  and a pipe that fills blocks the writer, so draining stdout to EOF and only
+  then reading stderr hangs whenever stderr fills first. Reproduced against a
+  child writing 270 KB to stderr: the old shape never returned, the new one
+  returns immediately. Not reachable through `quint` at `--verbosity=0` — the
+  most a broken spec produced was 337 bytes — so this was latent rather than
+  live, and the fix is one `future` that drains stderr while stdout is read.
+
+- **`mbt::actionTaken` is the first *named* action, not the outermost one**, and
+  [notes/itf-format.md](docs/notes/itf-format.md) said otherwise. It claimed
+  `any { all { a, b } }` yields `""`; it yields `"a"`. A named `step` records
+  `"step"`. The empty string appears only when the branch that fired is built
+  from bare assignments with no named action inside it. Corrected by recording,
+  and `anonymous.qnt` / `anonymous_0.itf.json` now carry both cases in one
+  trace — which also closes the one failure mode in the taxonomy that had no
+  fixture and no test, against CONTRIBUTING's own rule.
 
 ## [0.5.0] — 2026-08-21
 

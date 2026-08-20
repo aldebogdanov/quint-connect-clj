@@ -59,15 +59,30 @@ a state reader if they want something else. Fixture: `shapes_0.itf.json`.
 
 `quint run --mbt` adds two variables to every state:
 
-- `mbt::actionTaken` — the name of the action taken to reach this state.
-  `"init"` in state 0. Empty string when the action was anonymous.
+- `mbt::actionTaken` — the **first named action** the step executed, which is
+  not always the one you would name yourself. `"init"` in state 0. Empty string
+  only when the branch that fired contains no named action anywhere in it.
 - `mbt::nondetPicks` — a record of every `nondet` binding in the `step` action,
   each wrapped in `Some`/`None`. Bindings not used on the branch that fired are
   `None`. In `shapes.qnt`, whose `step` has no `nondet`, it is `{}`.
 
-An anonymous action (`any { all { a, b } }`) yields `""` and cannot be
-dispatched. The fix belongs in the spec: name the combined action. quint-connect
-must say so in the error message.
+**Corrected 2026-08-21, by recording rather than by reading.** This section
+used to say `any { all { a, b } }` yields `""`. It does not: if `a` and `b` are
+named actions, that branch records `"a"`. Nor does a named `step` go anonymous
+— `action step = all { a, b }` records `"step"`. The empty string appears only
+when the branch that fired is built from bare assignments, with no named action
+inside it at all:
+
+```
+action step = any {
+  all { n' = n + 1, touched' = true },   // "" — nothing named in here
+  idle,                                  // "idle"
+}
+```
+
+That still cannot be dispatched, and the fix is still in the spec: name the
+combination. Fixture: `anonymous.qnt`, `anonymous_0.itf.json`, which carries
+both cases in one trace.
 
 ## Verified CLI behaviour
 

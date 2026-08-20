@@ -15,6 +15,7 @@ the commands in [../../docs/notes/itf-format.md](../../docs/notes/itf-format.md)
 | `shapes.qnt`, `shapes_0.itf.json`           | one instance of every ITF value encoding, lists included  |
 | `bigint.qnt`, `bigint_rust_0.itf.json`      | large-integer serialization quirk under `--backend=rust`  |
 | `bigint_typescript_0.itf.json`              | the same spec, encoded correctly by the typescript backend |
+| `anonymous.qnt`, `anonymous_0.itf.json`     | a step with one branch that has no named action in it, so `mbt::actionTaken` is `""` — the case a driver cannot dispatch |
 | `collide.qnt`, `collide_0.itf.json`         | one module instantiated twice, so two variables end in `::n` — decodes only with a `:key-fn` |
 
 The `#meta.timestamp` and `#meta.description` fields differ on every
