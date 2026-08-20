@@ -216,6 +216,23 @@
       (is (= [:amont] (:missing (ex-data e))))
       (is (str/includes? (ex-message e) "Rename the parameter")))))
 
+(deftest an-anonymous-action-says-to-name-it-in-the-spec
+  ;; mbt::actionTaken is "" only when the branch that fired contains no named
+  ;; action anywhere in it. anonymous.qnt records both cases in one trace: an
+  ;; "idle" step and two anonymous ones. Nothing can dispatch on "", and the
+  ;; fix is in the spec, so the message must say that rather than read as a
+  ;; handler someone forgot to write.
+  (let [app (atom {:n 0 :touched false})
+        drv {:actions {"idle" {:fn (fn [_] nil) :var nil}}
+             :readers [{:fn (fn [] @app) :var nil}]
+             :init    {:fn (fn [] (reset! app {:n 0 :touched false})) :var nil}}
+        e   (try (replay/run-trace drv (trace "anonymous_0.itf.json"))
+                 (catch clojure.lang.ExceptionInfo ex ex))]
+    (is (= :anonymous-action (:quint/error (ex-data e))))
+    (is (str/includes? (ex-message e) "name the combined action")
+        "the fix belongs in the spec, and the message has to point there")
+    (is (= #{"idle"} (:known (ex-data e))) "and say what it does know")))
+
 ;; --- a throwing handler is a result, not an exception ---------------------
 
 (deftest throwing-handler-is-reported

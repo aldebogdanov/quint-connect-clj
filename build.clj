@@ -10,7 +10,7 @@
   (:require [clojure.tools.build.api :as b]))
 
 (def lib 'org.clojars.aldebogdanov/quint-connect)
-(def version "0.4.0")
+(def version "0.5.0")
 
 (def ^:private class-dir "target/classes")
 (def ^:private jar-file (format "target/%s-%s.jar" (name lib) version))

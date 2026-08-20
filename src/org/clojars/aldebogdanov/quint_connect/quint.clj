@@ -25,9 +25,12 @@
                  (fail :quint-not-found
                        "quint is not on PATH; trace generation needs it (replay does not)"
                        {:cause (ex-message e)})))
-        out (slurp (process/stdout p))
-        err (slurp (process/stderr p))]
-    {:exit @(process/exit-ref p) :out out :err err}))
+        ;; Both streams are pipes, and a pipe that fills blocks the writer.
+        ;; Draining them one after the other deadlocks whenever the second one
+        ;; fills while we are still reading the first.
+        err (future (slurp (process/stderr p)))
+        out (slurp (process/stdout p))]
+    {:exit @(process/exit-ref p) :out out :err @err}))
 
 (defn version
   "The version of the `quint` on PATH, as a string. Throws `ex-info` with

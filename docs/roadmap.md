@@ -221,9 +221,42 @@ turn comes; none is committed to now.
   `:compare` already covers it without new machinery.
 - Kaocha plugin: seed reporting, per-trace progress, `--focus` on a trace file.
   Roughly 100 lines against `kaocha.hierarchy`. Optional, separate artifact with
-  its own `deps.edn`.
+  its own `deps.edn`. **Later** — after the linter, which every user benefits
+  from rather than only Kaocha users.
 - `clj-kondo` hooks so annotated vars and unknown `:quint/*` keys are linted.
+  **Wanted.** `.clj-kondo/config.edn` already lints `defdriver` as `def`, which
+  is what stops a driver name reading as unresolved. What it does not do is
+  look at the annotations: a misspelled `:quint/actoin`, a `:quint/args` shape
+  that cannot compose, an annotation stranded under the wrong `:key-ns`. The
+  last of those is the gap
+  [0007](decisions/0007-annotation-keys.md) accepts at runtime and a linter is
+  the one place it could be closed without a namespace-similarity heuristic.
 - Shrinking. Probably never: the first diverging step is already the minimal
   information, and dropping steps from a state machine trace produces traces the
   spec never generated.
 - `witnesses` / `--invariants` support for targeted trace generation.
+
+- **Choreo support, end to end.** A later release, and the biggest single thing
+  missing. [Choreo](https://github.com/informalsystems/choreo/) is where the
+  Quint ecosystem is pointed, and a Choreo spec does not drive an
+  implementation as it stands. Recorded rather than guessed, from `choreo.qnt`:
+
+  ```quint
+  action step(listener, apply_custom_effect): bool = {
+    nondet v = oneOf(processes)
+    process_transitions(v, listener(convert_context(s, v)).filter(...), apply_custom_effect)
+  }
+  ```
+
+  A transition is **data** — `{post_state, effects}` — applied by one generic
+  action, so `mbt::actionTaken` is `process_transitions` on every step. There is
+  no name to dispatch on and no variable recording one, which is why Quint's own
+  docs say a Choreo spec must be "instrumented slightly". The picks do carry the
+  acting process.
+
+  The pieces exist: `:action-path` and `:nondet-path` for the instrumented
+  names, and `{:var :* :path [...]}` for state nested under `choreo::s.system`,
+  which is the same narrowing the Rust port's `Config.state` does. What is
+  missing is that none of it has been run: no example, no fixture, and a model
+  where the implementation is N processes rather than one application. Until an
+  `examples/choreo/` exists and is green, this section is inference and says so.
