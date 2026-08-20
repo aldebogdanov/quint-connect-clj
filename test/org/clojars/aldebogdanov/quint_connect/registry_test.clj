@@ -242,6 +242,43 @@
       (is (= #{:who :amt} (get-in d [:actions "credit" :needs])))
       (is (= :quint/args (get-in d [:actions "transfer" :needs-from]))))))
 
+(deftest args-compose-any-shape-the-handler-takes-apart
+  ;; :quint/args is the inverse of destructuring: an entry is the shape of that
+  ;; argument with pick names where its values go. Read each annotation in the
+  ;; fixture against the parameter list beside it.
+  (let [d    (registry/resolve-driver
+              {:scan [(fixture :args-shapes)]})
+        call (fn [action picks] ((get-in d [:actions action :fn]) picks))]
+    (testing "a vector, for [[x y]]"
+      (is (= [1 2] (call "pair" {:x 1 :y 2}))))
+    (testing "vectors nested in vectors, for [[a [b c]]]"
+      (is (= [1 2 3] (call "nestedVec" {:a 1 :b 2 :c 3}))))
+    (testing "a vector inside a map, for [{:keys [pos id]}]"
+      (is (= [[1 2] 7] (call "mapWithVec" {:x 1 :y 2 :i 7}))))
+    (testing "a map inside a vector, for [[{:keys [a]} b]]"
+      (is (= [1 2] (call "vecWithMap" {:pa 1 :b 2}))))
+    (testing "and as deep as the destructuring goes"
+      (is (= [1 [2 3]] (call "deep" {:p 1 :q 2 :r 3}))))
+    (testing "every leaf counts as a pick the trace will be held to"
+      (is (= #{:x :y :i} (get-in d [:actions "mapWithVec" :needs])))
+      (is (= #{:p :q :r} (get-in d [:actions "deep" :needs])))
+      (is (= #{:pa :b} (get-in d [:actions "vecWithMap" :needs]))))))
+
+(deftest a-shape-that-cannot-be-composed-is-rejected
+  (testing "a set, which nothing destructures positionally"
+    (let [e (try (registry/resolve-driver
+                  {:scan [(fixture :args-set)]})
+                 (catch clojure.lang.ExceptionInfo ex ex))]
+      (is (= :bad-args (:quint/error (ex-data e))))
+      (is (str/includes? (ex-message e) "set") "say why, not just that")))
+
+  (testing "a composed map keyed by something other than a keyword"
+    (let [e (try (registry/resolve-driver
+                  {:scan [(fixture :args-string-key)]})
+                 (catch clojure.lang.ExceptionInfo ex ex))]
+      (is (= :bad-args (:quint/error (ex-data e))))
+      (is (str/includes? (ex-message e) "keyword")))))
+
 (deftest the-picks-a-handler-needs-are-recorded-from-either-source
   ;; A parameter misspelled against the spec binds nil exactly as a misspelled
   ;; :quint/args does, so both are held to the trace. :needs-from is what

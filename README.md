@@ -123,6 +123,41 @@ The handler and reader vars are the payoff of declaring the mapping next to the
 code: the failure points at the function that diverged and at the one that
 observed it. The reproduce line is pasteable.
 
+### When the handler's shape is not one pick per parameter
+
+Picks bind by parameter name, which covers most handlers and requires nothing.
+`:quint/args` is for the rest, and it says **the shape of each argument, with
+pick names where its values go** — the exact inverse of the destructuring the
+handler performs on it:
+
+```clojure
+;; parameter names differ from the spec's pick names
+(defn withdraw {:quint/action "withdraw" :quint/args [:who :amount]}
+  [account n] ...)
+
+;; the function the application already had takes a map
+(defn transfer {:quint/action "transfer" :quint/args [{:from :src :to :dst}]}
+  [{:keys [from to]}] ...)
+
+;; and shapes nest as far as the parameter list takes them apart
+(defn move {:quint/action "move" :quint/args [[:x :y]]}          [[x y]] ...)
+(defn plot {:quint/action "plot" :quint/args [{:pos [:x :y]}]}   [{:keys [pos]}] ...)
+```
+
+Read each annotation against the parameter list beside it: one composes what
+the other takes apart. A keyword is a leaf, vectors and maps nest, and every
+leaf is a pick the trace is held to — a name no trace carries is an error at
+the step it was needed, not a silent `nil`. Prefix a parameter with `_` to say
+the handler does not need that pick.
+
+Two shapes look alike and are not. A handler destructuring **one pick whose
+value is a record or a tuple** wants `:quint/args [:m]`; a handler that wants
+**the whole picks map** belongs in the driver map's `:actions`, where that is
+the calling convention. Annotating the second shape without `:quint/args` is an
+error that names both.
+
+See [decisions/0011-args-compose-shapes.md](docs/decisions/0011-args-compose-shapes.md).
+
 ### The trace outlives the run
 
 That `saved` line is a random trace made permanent. Move it out of the

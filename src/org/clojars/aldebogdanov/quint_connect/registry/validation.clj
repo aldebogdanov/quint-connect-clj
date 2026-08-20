@@ -65,14 +65,55 @@
                       " handle an action at all.")))
           {:var v :arglists arglists})))
 
+(defn- template!
+  "One `:quint/args` entry, checked. A pick name is a leaf; a vector or a map
+  composes one out of others. Recursive, because destructuring is."
+  [v args template]
+  (cond
+    (keyword? template) nil
+
+    (vector? template)
+    (run! #(template! v args %) template)
+
+    (map? template)
+    (do (when-some [bad (first (remove keyword? (keys template)))]
+          (fail :bad-args
+                (str v " has the :quint/args key " (pr-str bad) ", and the keys"
+                     " of a composed map are the keys the handler destructures,"
+                     " which are keywords. Quint records decode with keyword"
+                     " keys, so this is the shape that meets them.")
+                {:var v :args args :template template :found bad}))
+        (run! #(template! v args %) (vals template)))
+
+    :else
+    (fail :bad-args
+          (str v " has the :quint/args entry " (pr-str template) ", which is"
+               " neither a pick name nor a vector or map composing one out of"
+               " picks. Write :who, or [:x :y], or {:from :src}"
+               (when (set? template)
+                 (str ". A set has no positional meaning and nothing"
+                      " destructures one, so it is not a shape that can be"
+                      " composed here"))
+               ".")
+          {:var v :args args :template template})))
+
 (defn args!
   "Check an explicit `:quint/args`. Takes the var (for the message) and the
   annotation. Returns it.
 
-  An entry is a pick name, or a map building one argument out of several picks:
-  its values name the picks, its keys name what the handler destructures. That
-  second form is what lets a function whose own signature takes a map be
-  annotated where it stands, instead of being wrapped.
+  `:quint/args` is a vector, one entry per argument, and each entry is the
+  **shape of that argument** with pick names where its values go — the exact
+  inverse of the destructuring the handler performs on it:
+
+      handler                        :quint/args
+      [who amount]                   [:who :amount]
+      [{:keys [from to]}]            [{:from :src :to :dst}]
+      [[x y]]                        [[:x :y]]
+      [{:keys [pos]}]                [{:pos [:x :y]}]
+      [[{:keys [a]} b]]              [[{:a :pa} :b]]
+
+  A pick name is a leaf; vectors and maps nest as deeply as the handler takes
+  them apart. Map keys are literal, map values are shapes in their own right.
 
   Throws `:bad-args`."
   [v args]
@@ -81,25 +122,7 @@
           (str v " has :quint/args " (pr-str args) ", and :quint/args must be a"
                " vector, one entry per argument, as in [:who :amount].")
           {:var v :args args}))
-  (doseq [entry args]
-    (cond
-      (keyword? entry) nil
-
-      (map? entry)
-      (when-some [bad (first (remove keyword? (concat (keys entry) (vals entry))))]
-        (fail :bad-args
-              (str v " has the :quint/args entry " (pr-str entry) ", and a map"
-                   " entry must be keyword to keyword — the key naming what the"
-                   " handler destructures, the value naming the pick it comes"
-                   " from, as in {:from :src}. " (pr-str bad) " is neither.")
-              {:var v :args args :entry entry :found bad}))
-
-      :else
-      (fail :bad-args
-            (str v " has the :quint/args entry " (pr-str entry) ", which is"
-                 " neither a pick name nor a map building an argument from"
-                 " picks. Write :who, or {:from :src :amount :amt}.")
-            {:var v :args args :entry entry})))
+  (run! #(template! v args %) args)
   args)
 
 (def state-keys

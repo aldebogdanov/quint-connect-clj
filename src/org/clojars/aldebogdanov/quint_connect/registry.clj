@@ -20,16 +20,26 @@
            (meta v))))
 
 (defn- arg-value
-  "One argument, from the picks. A pick name is looked up; a map is built, its
-  values naming the picks and its keys naming what the handler destructures."
-  [picks entry]
-  (if (map? entry)
-    (reduce-kv (fn [m k pick] (assoc m k (get picks pick))) {} entry)
-    (get picks entry)))
+  "One argument, composed from the picks — the inverse of the destructuring the
+  handler performs on it. A pick name is a leaf and is looked up; a vector
+  composes a vector, a map composes a map with those keys. Recursive, because
+  destructuring is."
+  [picks template]
+  (cond
+    (vector? template) (mapv #(arg-value picks %) template)
+    (map? template)    (reduce-kv (fn [m k t] (assoc m k (arg-value picks t))) {} template)
+    :else              (get picks template)))
+
+(defn- pick-leaves
+  "Every pick name a template mentions, however deeply nested."
+  [template]
+  (cond
+    (vector? template) (mapcat pick-leaves template)
+    (map? template)    (mapcat pick-leaves (vals template))
+    :else              [template]))
 
 (defn- needed-picks
-  "The picks a handler needs, as a set: the bare entries, and the values of the
-  map entries.
+  "The picks a handler needs, as a set: every leaf of every entry.
 
   Names beginning with `_` are left out. `[_n]` is Clojure's way of saying a
   parameter is not used, and getting-started §3 already sanctions it as the way
@@ -37,7 +47,7 @@
   encodes a rule that was written down rather than inventing one."
   [args]
   (into #{}
-        (comp (mapcat #(if (map? %) (vals %) [%]))
+        (comp (mapcat pick-leaves)
               (remove #(str/starts-with? (name %) "_")))
         args))
 

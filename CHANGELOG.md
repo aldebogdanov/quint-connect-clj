@@ -6,7 +6,33 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
-Nothing since 0.4.0.
+### Added
+
+- **`:quint/args` composes any shape the handler takes apart.** An entry is a
+  pick name, or a vector or map of entries, nesting as deep as the parameter
+  list does — the exact inverse of destructuring:
+
+  ```
+  handler                        :quint/args
+  [{:keys [from to]}]            [{:from :src :to :dst}]
+  [[x y]]                        [[:x :y]]
+  [{:keys [pos]}]                [{:pos [:x :y]}]
+  [[{:keys [a]} b]]              [[{:a :pa} :b]]
+  ```
+
+  Additive: a flat vector of pick names, and the flat map 0.4.0 introduced, are
+  both exactly what they were. Sets are rejected — nothing destructures one
+  positionally — and composed map keys must be keywords, which is a restriction
+  rather than a necessity and is written down as one in
+  [0011](docs/decisions/0011-args-compose-shapes.md).
+
+### Fixed
+
+- The README documented `:quint/args` nowhere at all — not the map form 0.4.0
+  added, and not the plain vector form that predates it. It now carries the
+  whole key, including the two shapes that look alike: destructuring one pick
+  whose value is a record or tuple (`:quint/args [:m]`) versus wanting the
+  whole picks map (the driver map's `:actions`).
 
 ## [0.4.0] — 2026-08-20
 
