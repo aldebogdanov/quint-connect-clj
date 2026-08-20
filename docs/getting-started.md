@@ -74,7 +74,7 @@ its classpath.
  :aliases
  {:test {:extra-paths ["test"]
          :extra-deps  {org.clojars.aldebogdanov/quint-connect
-                       {:mvn/version "0.5.0"}
+                       {:mvn/version "0.5.1"}
 
                        io.github.cognitect-labs/test-runner
                        {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
@@ -384,7 +384,7 @@ recorded failure a deterministic regression test — see §6.
 
 ## Rough edges, honestly
 
-- **0.5.0 is an early release.** The API is the one described here and is not
+- **0.5.1 is an early release.** The API is the one described here and is not
   expected to move, but nothing has been used in anger by anyone but its
   author. The license is [EPL-2.0](../LICENSE), the same as Clojure's.
 - **`:missing-state` is not implemented.** A spec variable that no reader

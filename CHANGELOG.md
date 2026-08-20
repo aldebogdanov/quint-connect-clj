@@ -6,6 +6,10 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
+Nothing since 0.5.1.
+
+## [0.5.1] — 2026-08-21
+
 ### Fixed
 
 - **`quint/exec` could deadlock.** Both of a subprocess's streams are pipes,

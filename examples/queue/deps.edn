@@ -3,7 +3,7 @@
 
  :aliases
  {:test {:extra-paths ["test"]
-         :extra-deps  {org.clojars.aldebogdanov/quint-connect {:mvn/version "0.5.0"}
+         :extra-deps  {org.clojars.aldebogdanov/quint-connect {:mvn/version "0.5.1"}
 
                        io.github.cognitect-labs/test-runner
                        {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
