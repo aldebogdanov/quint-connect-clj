@@ -6,10 +6,14 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
-Targets **0.4.0**: the changes below reject annotations that 0.3.0 accepted and
-then failed to read, so a driver that resolved before may now throw. That is
-the point — every one of these was a divergence with no cause attached to it —
-but it is a breaking change and gets a minor bump rather than a patch.
+Nothing since 0.4.0.
+
+## [0.4.0] — 2026-08-20
+
+The changes below reject annotations that 0.3.0 accepted and then failed to
+read, so a driver that resolved before may now throw. That is the point — every
+one of these was a divergence with no cause attached to it — but it is a
+breaking change and gets a minor bump rather than a patch.
 
 ### Added
 
