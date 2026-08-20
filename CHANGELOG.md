@@ -6,6 +6,10 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
+Nothing since 0.5.0.
+
+## [0.5.0] — 2026-08-21
+
 ### Added
 
 - **`:quint/args` composes any shape the handler takes apart.** An entry is a

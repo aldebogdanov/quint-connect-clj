@@ -3,7 +3,7 @@
 Model-based testing for Clojure, driven by [Quint](https://quint-lang.org/)
 specifications.
 
-Status: **0.4.0**. Every planned milestone in
+Status: **0.5.0**. Every planned milestone in
 [docs/roadmap.md](docs/roadmap.md) is done — decoding, replay, the annotation
 registry, the Quint CLI, the public API, failure artifacts, scripted runs and
 `verify`. `bb test` runs a real model-based test end to end, needing no Quint.
@@ -32,7 +32,7 @@ no return-value convention, no require. This is the Clojure counterpart of
 
 ```clojure
 ;; belongs in a :test alias and nowhere else
-org.clojars.aldebogdanov/quint-connect {:mvn/version "0.4.0"}
+org.clojars.aldebogdanov/quint-connect {:mvn/version "0.5.0"}
 ```
 
 ## Usage
