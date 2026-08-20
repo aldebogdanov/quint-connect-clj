@@ -11,3 +11,13 @@ node_modules/
 
 # Traces written by failing runs; promote them to test-resources/ deliberately.
 **/test-resources/quint-connect/failures/
+
+# Apalache's log directory. `quint verify` writes it into whatever directory it
+# was invoked from; quint-connect contains it in a scratch directory that it
+# deletes, but running `quint verify` by hand from a spec directory leaves one
+# behind. The name is Apalache's and cannot be changed — see
+# docs/notes/itf-format.md §`quint verify`.
+_apalache-out/
+
+# nREPL writes this on every REPL start.
+.nrepl-port
