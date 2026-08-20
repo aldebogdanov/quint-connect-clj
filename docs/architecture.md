@@ -110,6 +110,7 @@ mechanics, all verified against Clojure 1.12.5 by
 | --------------------------------------------- | --------------------------- | ----------------------------------------------------------------------------------- |
 | `{:quint/action "deposit"}`                   | function var                | handler for that spec action; called with the picks as arguments                    |
 | `{:quint/args [:who :amount]}`                | function var                | pick names in argument order; defaults to `:arglists`; **required** for multi-arity |
+| `{:quint/args [{:from :src}]}`                | function var                | an entry may build one argument out of picks: key destructured, value the pick |
 | `{:quint/state :balances}`                    | function var / `IDeref` var | supplies the value of that spec variable                                            |
 | `{:quint/state {:var :lastError :path [:e]}}` | function var / `IDeref` var | supplies it from a nested position                                                  |
 | `{:quint/state :*}`                           | function var / `IDeref` var | supplies a whole map of spec variables, merged; takes `:path` too                                      |
@@ -153,6 +154,11 @@ scans empty. That gap is accepted and its shape is written down in
 (defn withdraw                               ; parameter names differ from pick names
   {:quint/action "withdraw" :quint/args [:who :amount]}
   [account n]
+  ...)
+
+(defn transfer                               ; the signature the application had
+  {:quint/action "transfer" :quint/args [{:from :src :to :dst :amount :amt}]}
+  [{:keys [from to amount]}]                 ; keys destructured, values the picks
   ...)
 ```
 
@@ -316,9 +322,11 @@ downstream of the registry knows that metadata exists.
   `(def f (fn ...))` leaves behind and what annotating a var that holds no
   function looks like from here. Every parameter is a pick name, and a
   parameter with no name would arrive as nil on every step.
+- `:bad-args` — a `:quint/args` that cannot be read: not a vector, or an entry
+  that is neither a pick name nor a map of keyword to keyword. See
+  [0010](decisions/0010-args-shapes.md).
 - `:bad-state-spec` — a `:quint/state` map that would go partly unread: an
-  unknown key, a missing `:var`, a `:path` that is not a vector, or a `:path`
-  alongside `:*`.
+  unknown key, a missing `:var`, or a `:path` that is not a vector.
 - `:unnamed-driver` — a var scoped with `:quint/driver` in a driver that has no
   `:name` to match it against. See
   [0009](decisions/0009-driver-scope.md).
@@ -327,6 +335,14 @@ At replay time, because each of these needs the trace: `:no-init` (it starts
 with an action nothing is annotated for), `:unknown-action`,
 `:anonymous-action`, `:state-read-failed`, plus a coverage report of handlers
 the traces never exercised.
+
+`:bad-args` and `:bad-arglist` are also raised at **replay**, for a pick the
+handler needs that the trace does not carry — the check the map form exists to
+make possible. Both sources are held to it, since a parameter misspelled
+against the spec binds nil exactly as a misspelled annotation does; the keyword
+says which one to fix. A pick name beginning with `_` is never checked: that is
+already the documented way to ignore a pick (§3 of getting-started), and three
+of the four examples rely on it.
 
 `:duplicate-state` is raised in **both** places. A reader that names its
 variable is checked at construction; a `:*` reader names nothing, so what it
@@ -470,8 +486,8 @@ The keywords:
 :quint-not-found  :quint-failed  :no-traces  :test-failed  :bad-itf
 :bad-decode-path  :name-collision  :empty-scan  :duplicate-action
 :duplicate-state  :duplicate-init  :duplicate-halt  :ambiguous-arity
-:bad-arglist  :bad-state-spec  :unnamed-driver  :no-init  :unknown-action
-:anonymous-action  :state-read-failed  :save-failed
+:bad-arglist  :bad-args  :bad-state-spec  :unnamed-driver  :no-init
+:unknown-action  :anonymous-action  :state-read-failed  :save-failed
 ```
 
 That list is the whole set, and it is checked against the source rather than

@@ -183,6 +183,39 @@
                                    (trace "bank_run_0.itf.json"))]
     (is (:ok? r) "the override supplies :balances and nothing complains")))
 
+(deftest a-pick-the-trace-does-not-carry-is-rejected
+  ;; Before this it bound nil and the failure blamed the implementation for a
+  ;; state the picks had never reached.
+  (testing "named in :quint/args, which is where a typo hides best"
+    (let [e (try (replay/run-trace
+                  (driver :actions {"deposit"   {:fn deposit! :var #'deposit!
+                                                 :needs #{:wo :amount}
+                                                 :needs-from :quint/args}
+                                    "withdraw"  {:fn withdraw! :var #'withdraw!}
+                                    "overdraft" {:fn overdraft! :var #'overdraft!}})
+                  (trace "bank_run_0.itf.json"))
+                 (catch clojure.lang.ExceptionInfo ex ex))]
+      (is (= :bad-args (:quint/error (ex-data e))))
+      (is (= [:wo] (:missing (ex-data e))))
+      (is (str/includes? (ex-message e) ":quint/args") "which annotation to fix")
+      (testing "and the message says what the trace does carry"
+        (is (str/includes? (ex-message e) ":amount"))
+        (is (str/includes? (ex-message e) ":who")))))
+
+  (testing "or misspelled in the parameter list, which is the same nil"
+    (let [e (try (replay/run-trace
+                  (driver :actions {"deposit"   {:fn deposit! :var #'deposit!
+                                                 :needs #{:amont}
+                                                 :needs-from :arglist}
+                                    "withdraw"  {:fn withdraw! :var #'withdraw!}
+                                    "overdraft" {:fn overdraft! :var #'overdraft!}})
+                  (trace "bank_run_0.itf.json"))
+                 (catch clojure.lang.ExceptionInfo ex ex))]
+      (is (= :bad-arglist (:quint/error (ex-data e)))
+          "a different keyword, because a different annotation is wrong")
+      (is (= [:amont] (:missing (ex-data e))))
+      (is (str/includes? (ex-message e) "Rename the parameter")))))
+
 ;; --- a throwing handler is a result, not an exception ---------------------
 
 (deftest throwing-handler-is-reported

@@ -343,6 +343,7 @@ you use; `:quint/driver` only matters when one namespace serves two specs.
 | ---------- | ------- | ----- |
 | `{:quint/action "add"}` | a function | handler for that spec action |
 | `{:quint/args [:who :amount]}` | a function | pick order, when parameter names differ; **required** for multi-arity |
+| `{:quint/args [{:from :src}]}` | a function | an entry may build one argument out of picks, for a handler that takes a map |
 | `{:quint/state :count}` | an atom/ref var, or a getter function | supplies that spec variable |
 | `{:quint/state {:var :lastOp :path [:err]}}` | same | supplies it from a nested position |
 | `{:quint/state :*}` | a getter function | supplies a whole map of variables; takes `:path` too |

@@ -225,6 +225,64 @@
       (is (= :bad-state-spec (:quint/error (ex-data e))))
       (is (str/includes? (ex-message e) "vector of keys")))))
 
+(deftest args-may-build-an-argument-out-of-picks
+  ;; A function whose own signature takes a map could not be annotated at all
+  ;; before: positional binding has no name to bind, and :actions meant moving
+  ;; the mapping away from the code it describes.
+  (let [d (registry/resolve-driver
+           {:scan [(fixture :args-map)]})]
+    (testing "one argument, built from three picks under different names"
+      (is (= ["a" "b" 5]
+             ((get-in d [:actions "transfer" :fn]) {:src "a" :dst "b" :amt 5}))))
+    (testing "and the two entry forms compose"
+      (is (= ["a" 5]
+             ((get-in d [:actions "credit" :fn]) {:who "a" :amt 5}))))
+    (testing "the pick names are recorded, so replay can hold the trace to them"
+      (is (= #{:src :dst :amt} (get-in d [:actions "transfer" :needs])))
+      (is (= #{:who :amt} (get-in d [:actions "credit" :needs])))
+      (is (= :quint/args (get-in d [:actions "transfer" :needs-from]))))))
+
+(deftest the-picks-a-handler-needs-are-recorded-from-either-source
+  ;; A parameter misspelled against the spec binds nil exactly as a misspelled
+  ;; :quint/args does, so both are held to the trace. :needs-from is what
+  ;; decides which annotation the failure sends you to.
+  (let [d (registry/resolve-driver
+           {:scan [(fixture :bank)]})]
+    (testing "derived from the parameter list"
+      (is (= #{:who :amount} (get-in d [:actions "deposit" :needs])))
+      (is (= :arglist (get-in d [:actions "deposit" :needs-from]))))
+    (testing "written into :quint/args"
+      (is (= #{:who :amount} (get-in d [:actions "withdraw" :needs])))
+      (is (= :quint/args (get-in d [:actions "withdraw" :needs-from]))))
+    (testing "and an _-prefixed parameter asks for nothing"
+      ;; overdraft is [_who _amount]. getting-started §3 documents those
+      ;; arriving nil, so they must not become a demand on the trace -- and
+      ;; bank_run_0 fires overdraft, so replaying it is the whole-loop proof.
+      (is (= #{} (get-in d [:actions "overdraft" :needs])))
+      (is (:ok? (replay/run-trace d (trace "bank_run_0.itf.json")))))))
+
+(deftest a-quint-args-that-cannot-be-read-is-rejected
+  (testing "not a vector, which threw IllegalArgumentException at replay"
+    (let [e (try (registry/resolve-driver
+                  {:scan [(fixture :args-not-a-vector)]})
+                 (catch clojure.lang.ExceptionInfo ex ex))]
+      (is (= :bad-args (:quint/error (ex-data e))))
+      (is (str/includes? (ex-message e) "must be a vector"))))
+
+  (testing "a map entry whose value does not name a pick"
+    (let [e (try (registry/resolve-driver
+                  {:scan [(fixture :args-bad-entry)]})
+                 (catch clojure.lang.ExceptionInfo ex ex))]
+      (is (= :bad-args (:quint/error (ex-data e))))
+      (is (str/includes? (ex-message e) "{:from :src}")
+          "the message must show the form that works")))
+
+  (testing "an entry that is neither a pick name nor a map"
+    (let [e (try (registry/resolve-driver
+                  {:scan [(fixture :args-bare-entry)]})
+                 (catch clojure.lang.ExceptionInfo ex ex))]
+      (is (= :bad-args (:quint/error (ex-data e)))))))
+
 (deftest a-pick-whose-value-is-a-record-may-be-destructured
   ;; Two different intentions produce the same arglist: destructuring the picks
   ;; map, which is :actions' convention, and destructuring one pick whose value

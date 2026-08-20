@@ -20,6 +20,32 @@ but it is a breaking change and gets a minor bump rather than a patch.
   action at all; 0.3.0 called both of those "has 0 arities".
 - `:bad-state-spec` — a `:quint/state` map that would go partly unread: an
   unknown key, a missing `:var`, or a `:path` that is not a vector.
+- `:quint/args` may build an argument out of picks. An entry is a pick name, or
+  a map whose keys name what the handler destructures and whose values name the
+  picks they come from:
+
+  ```clojure
+  (defn transfer
+    {:quint/action "transfer" :quint/args [{:from :src :to :dst :amount :amt}]}
+    [{:keys [from to amount]}]
+    ...)
+  ```
+
+  A function whose own signature takes a map could not be annotated at all
+  before — positional binding has no name to bind, and `:actions` meant moving
+  the mapping away from the code it describes. The two entry forms compose.
+  This is a value form, not a seventh key; the vocabulary is still six. The
+  rule it was spent against is recorded in
+  [0010](docs/decisions/0010-args-shapes.md).
+- `:bad-args` — at construction, a `:quint/args` that is not a vector or whose
+  entry is neither a pick name nor a map of keyword to keyword.
+- **A pick the handler needs that the trace does not carry is now an error at
+  replay**, from either source: `:bad-args` when the name was written into
+  `:quint/args`, `:bad-arglist` when it came from the parameter list. A
+  parameter misspelled against the spec bound nil exactly as a misspelled
+  annotation did. Names beginning with `_` are never checked — that is already
+  the documented way to ignore a pick, and three of the four examples rely
+  on it.
 - `:path` on a `:*` reader. A whole state map is as likely to sit nested inside
   a system map as a single variable is — which is the shape a Choreo-style
   spec's per-node state arrives in — so `{:var :* :path [:app :state]}` now
@@ -47,6 +73,12 @@ but it is a breaking change and gets a minor bump rather than a patch.
   never checked and nothing said so. Now `:bad-state-spec`.
 - **A `:path` that was not a vector threw `IllegalArgumentException`**, with no
   `:quint/error` on it. The decoder had this guard; the registry did not.
+- **`:quint/args` was not validated at all.** `:quint/args :who` resolved and
+  then threw `IllegalArgumentException` at replay; `:quint/args [:wo :amount]`
+  resolved, ran, and bound `nil`. The second is the sharper one: `:quint/args`
+  exists for when parameter names differ from pick names, so a typo in it lands
+  where nobody is looking, and the failure blamed the implementation for a
+  state the picks had never reached. Both are `:bad-args` now.
 - **Two `:*` readers supplying one variable resolved silently**, with the
   winner decided by `ns-interns` hash order rather than by anything the author
   wrote. It is now `:duplicate-state`, raised by `replay/run-trace` rather than

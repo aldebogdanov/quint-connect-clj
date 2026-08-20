@@ -65,6 +65,43 @@
                       " handle an action at all.")))
           {:var v :arglists arglists})))
 
+(defn args!
+  "Check an explicit `:quint/args`. Takes the var (for the message) and the
+  annotation. Returns it.
+
+  An entry is a pick name, or a map building one argument out of several picks:
+  its values name the picks, its keys name what the handler destructures. That
+  second form is what lets a function whose own signature takes a map be
+  annotated where it stands, instead of being wrapped.
+
+  Throws `:bad-args`."
+  [v args]
+  (when-not (vector? args)
+    (fail :bad-args
+          (str v " has :quint/args " (pr-str args) ", and :quint/args must be a"
+               " vector, one entry per argument, as in [:who :amount].")
+          {:var v :args args}))
+  (doseq [entry args]
+    (cond
+      (keyword? entry) nil
+
+      (map? entry)
+      (when-some [bad (first (remove keyword? (concat (keys entry) (vals entry))))]
+        (fail :bad-args
+              (str v " has the :quint/args entry " (pr-str entry) ", and a map"
+                   " entry must be keyword to keyword — the key naming what the"
+                   " handler destructures, the value naming the pick it comes"
+                   " from, as in {:from :src}. " (pr-str bad) " is neither.")
+              {:var v :args args :entry entry :found bad}))
+
+      :else
+      (fail :bad-args
+            (str v " has the :quint/args entry " (pr-str entry) ", which is"
+                 " neither a pick name nor a map building an argument from"
+                 " picks. Write :who, or {:from :src :amount :amt}.")
+            {:var v :args args :entry entry})))
+  args)
+
 (def state-keys
   "The keys `:quint/state` reads when it is given a map."
   #{:var :path})

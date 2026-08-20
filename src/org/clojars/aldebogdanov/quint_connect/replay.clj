@@ -1,7 +1,8 @@
 (ns org.clojars.aldebogdanov.quint-connect.replay
   "Run one decoded trace against a resolved driver. No I/O of its own: the only
   effects are the ones the driver's own functions perform."
-  (:require [clojure.data :as data]))
+  (:require [clojure.data :as data]
+            [clojure.string :as str]))
 
 (defn- fail [error msg data]
   (throw (ex-info msg (assoc data :quint/error error))))
@@ -72,6 +73,42 @@
                                      (str "no handler for action " (pr-str action))
                                      {:action action :known (set (keys actions))})))
 
+(defn- needed-picks!
+  "Check that every pick this handler needs is in this step's picks.
+
+  Both sources are held to the trace: names written into `:quint/args`, and
+  names derived from the parameter list, since a parameter misspelled against
+  the spec binds nil exactly as a misspelled annotation does. The keyword says
+  which one to go and fix.
+
+  A pick name beginning with `_` is never checked. That is Clojure's way of
+  saying a parameter is unused, and getting-started §3 already sanctions it as
+  the way to ignore a pick, so the exemption encodes a documented rule rather
+  than carving one out.
+
+  Throws `:bad-args` for a name from `:quint/args`, `:bad-arglist` for one from
+  the parameter list."
+  [{:keys [needs] from :needs-from var- :var} action picks]
+  (when-some [missing (seq (remove #(contains? picks %) needs))]
+    (let [named (str/join ", " (map pr-str (sort missing)))
+          has   (if (seq picks)
+                  (str/join ", " (map pr-str (sort (keys picks))))
+                  "no picks at all")]
+      (if (= :arglist from)
+        (fail :bad-arglist
+              (str (or var- (str "the handler for " (pr-str action)))
+                   " takes a parameter named for the pick " named
+                   ", which this trace does not carry. It has " has
+                   ". Rename the parameter, give the real order in :quint/args,"
+                   " or prefix it with _ if the handler does not need it.")
+              {:action action :var var- :missing (vec (sort missing))
+               :picks (vec (sort (keys picks)))})
+        (fail :bad-args
+              (str from " for action " (pr-str action) " names " named
+                   ", which this trace does not carry. It has " has ".")
+              {:action action :var var- :missing (vec (sort missing))
+               :picks (vec (sort (keys picks)))})))))
+
 (defn- mismatch
   "The diverging part of one comparison, or nil. Only the trace's own variables
   are compared: a reader supplying extra keys is not an error, while a spec
@@ -102,6 +139,7 @@
       (result driver used steps nil)
       (let [{:keys [index action picks]} st
             [h kind] (dispatch driver action (zero? steps))
+            _ (when (= :action kind) (needed-picks! h action picks))
             cause (try (if (= :init kind) ((:fn h)) ((:fn h) picks))
                        nil
                        (catch Exception e e))]
@@ -127,7 +165,11 @@
 
   The driver is data:
 
-    {:actions {\"deposit\" {:fn f :var v}}   f takes the picks map
+    {:actions {\"deposit\" {:fn f :var v :needs #{:who} :needs-from :arglist}}
+                                            f takes the picks map; :needs are the
+                                            picks the trace must carry, and
+                                            :needs-from says which annotation to
+                                            blame when it does not
      :readers [{:fn f :var v}]              f takes no arguments -> partial state
                                             :override? true exempts it from the
                                             duplicate check, for driver-map state
@@ -147,7 +189,7 @@
 
   Throws `ex-info` with `:quint/error` for a broken setup: `:no-init`,
   `:unknown-action`, `:anonymous-action`, `:state-read-failed`,
-  `:duplicate-state`."
+  `:duplicate-state`, `:bad-args`, `:bad-arglist`."
   [driver trace]
   (try
     (replay-states driver (:states trace))

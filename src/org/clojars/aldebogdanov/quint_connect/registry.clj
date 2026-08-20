@@ -5,7 +5,8 @@
 
   What it reads is decided here; whether what it read can be used is decided in
   `registry.validation`, which reflects over nothing."
-  (:require [org.clojars.aldebogdanov.quint-connect.registry.validation :as v]))
+  (:require [clojure.string :as str]
+            [org.clojars.aldebogdanov.quint-connect.registry.validation :as v]))
 
 (defn- annotation-key [key-ns n]
   (keyword (str key-ns) (name n)))
@@ -18,15 +19,44 @@
     (merge (when (instance? clojure.lang.IReference value) (meta value))
            (meta v))))
 
-(defn- picks->args
-  "Pick names in argument order: `:quint/args` if given, else the sole arglist."
-  [var- m args-key]
-  (or (get m args-key)
-      (v/pick-names! var- (:arglists (meta var-)))))
+(defn- arg-value
+  "One argument, from the picks. A pick name is looked up; a map is built, its
+  values naming the picks and its keys naming what the handler destructures."
+  [picks entry]
+  (if (map? entry)
+    (reduce-kv (fn [m k pick] (assoc m k (get picks pick))) {} entry)
+    (get picks entry)))
 
-(defn- action-handler [var- m args-key]
-  (let [args (picks->args var- m args-key)]
-    {:fn (fn [picks] (apply @var- (map picks args))) :var var-}))
+(defn- needed-picks
+  "The picks a handler needs, as a set: the bare entries, and the values of the
+  map entries.
+
+  Names beginning with `_` are left out. `[_n]` is Clojure's way of saying a
+  parameter is not used, and getting-started §3 already sanctions it as the way
+  to ignore a pick — \"not a way to skip a pick the handler does need\". So this
+  encodes a rule that was written down rather than inventing one."
+  [args]
+  (into #{}
+        (comp (mapcat #(if (map? %) (vals %) [%]))
+              (remove #(str/starts-with? (name %) "_")))
+        args))
+
+(defn- action-handler
+  "A handler as replay wants it.
+
+  `:needs` is the picks the trace must carry for this handler, and
+  `:needs-from` is `:arglist` or the `:quint/args` key it was written under —
+  which decides whether a missing pick sends you to the parameter list or to
+  the annotation."
+  [var- m args-key]
+  (let [declared (get m args-key)
+        args     (if declared
+                   (v/args! var- declared)
+                   (v/pick-names! var- (:arglists (meta var-))))]
+    {:fn         (fn [picks] (apply @var- (map #(arg-value picks %) args)))
+     :var        var-
+     :needs      (needed-picks args)
+     :needs-from (if declared args-key :arglist)}))
 
 (defn- reader
   "A state reader as replay wants it: no arguments, returns a partial state map.
@@ -133,7 +163,8 @@
 
   Throws `ex-info` with `:quint/error` `:empty-scan`, `:unnamed-driver`,
   `:duplicate-action`, `:duplicate-state`, `:duplicate-init`,
-  `:duplicate-halt`, `:ambiguous-arity`, `:bad-arglist` or `:bad-state-spec`.
+  `:duplicate-halt`, `:ambiguous-arity`, `:bad-arglist`, `:bad-args` or
+  `:bad-state-spec`.
 
   Two readers that each name one variable are `:duplicate-state` here. A `:*`
   reader names nothing, so an overlap involving one is only knowable once it
