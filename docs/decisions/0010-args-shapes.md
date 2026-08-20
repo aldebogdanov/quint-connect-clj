@@ -1,6 +1,11 @@
 # 0010 — `:quint/args` may build an argument, and the rule spent to allow it
 
-Status: accepted, with the cost recorded rather than smoothed over.
+Status: **partially superseded** by
+[0011-args-compose-shapes.md](0011-args-compose-shapes.md), which generalised
+the grammar below to nest. Everything else here — why the map form exists, the
+validation it bought, the `_` rule, the alternatives rejected — stands.
+
+Originally: accepted, with the cost recorded rather than smoothed over.
 
 ## Question
 

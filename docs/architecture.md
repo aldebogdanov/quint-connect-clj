@@ -110,7 +110,7 @@ mechanics, all verified against Clojure 1.12.5 by
 | --------------------------------------------- | --------------------------- | ----------------------------------------------------------------------------------- |
 | `{:quint/action "deposit"}`                   | function var                | handler for that spec action; called with the picks as arguments                    |
 | `{:quint/args [:who :amount]}`                | function var                | pick names in argument order; defaults to `:arglists`; **required** for multi-arity |
-| `{:quint/args [{:from :src}]}`                | function var                | an entry may build one argument out of picks: key destructured, value the pick |
+| `{:quint/args [{:from :src}]}`                | function var                | an entry is the *shape* of that argument, pick names where its values go; vectors and maps nest |
 | `{:quint/state :balances}`                    | function var / `IDeref` var | supplies the value of that spec variable                                            |
 | `{:quint/state {:var :lastError :path [:e]}}` | function var / `IDeref` var | supplies it from a nested position                                                  |
 | `{:quint/state :*}`                           | function var / `IDeref` var | supplies a whole map of spec variables, merged; takes `:path` too                                      |
