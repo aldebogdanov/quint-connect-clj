@@ -345,7 +345,7 @@ you use; `:quint/driver` only matters when one namespace serves two specs.
 | `{:quint/args [:who :amount]}` | a function | pick order, when parameter names differ; **required** for multi-arity |
 | `{:quint/state :count}` | an atom/ref var, or a getter function | supplies that spec variable |
 | `{:quint/state {:var :lastOp :path [:err]}}` | same | supplies it from a nested position |
-| `{:quint/state :*}` | a getter function | supplies a whole map of variables |
+| `{:quint/state :*}` | a getter function | supplies a whole map of variables; takes `:path` too |
 | `{:quint/init true}` | a function | reset the app; runs once per trace |
 | `{:quint/halt true}` | a function | stop it; runs after every trace |
 | `{:quint/driver :ledger}` | any annotated var | only this driver reads it; absent means all of them |

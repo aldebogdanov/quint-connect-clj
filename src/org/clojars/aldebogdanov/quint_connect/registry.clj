@@ -1,11 +1,11 @@
 (ns org.clojars.aldebogdanov.quint-connect.registry
   "Turn `:quint/*` metadata into the resolved driver replay consumes. The only
   namespace that reflects, and only over the explicit `:scan` list. Rebuilt on
-  every call: no global registry, nothing cached between runs."
-  (:require [clojure.string :as str]))
+  every call: no global registry, nothing cached between runs.
 
-(defn- fail [error msg data]
-  (throw (ex-info msg (assoc data :quint/error error))))
+  What it reads is decided here; whether what it read can be used is decided in
+  `registry.validation`, which reflects over nothing."
+  (:require [org.clojars.aldebogdanov.quint-connect.registry.validation :as v]))
 
 (defn- annotation-key [key-ns n]
   (keyword (str key-ns) (name n)))
@@ -20,38 +20,36 @@
 
 (defn- picks->args
   "Pick names in argument order: `:quint/args` if given, else the sole arglist."
-  [v m args-key]
+  [var- m args-key]
   (or (get m args-key)
-      (let [arglists (:arglists (meta v))]
-        (if (= 1 (count arglists))
-          (mapv keyword (first arglists))
-          (fail :ambiguous-arity
-                (str v " has " (count arglists) " arities; add :quint/args to say"
-                     " which picks map to which argument")
-                {:var v :arglists arglists})))))
+      (v/pick-names! var- (:arglists (meta var-)))))
 
-(defn- action-handler [v m args-key]
-  (let [args (picks->args v m args-key)]
-    {:fn (fn [picks] (apply @v (map picks args))) :var v}))
+(defn- action-handler [var- m args-key]
+  (let [args (picks->args var- m args-key)]
+    {:fn (fn [picks] (apply @var- (map picks args))) :var var-}))
 
 (defn- reader
   "A state reader as replay wants it: no arguments, returns a partial state map.
-  An `IDeref` var is dereferenced, a function var is called, `:path` is applied
-  after either, and `:*` means the value already is the state map."
-  [v spec]
-  (let [raw   (if (instance? clojure.lang.IDeref (deref v))
-                (fn [] (deref (deref v)))
-                (fn [] ((deref v))))
-        {:keys [path] var-name :var} (if (map? spec) spec {:var spec})
+  An `IDeref` var is dereferenced, a function var is called, and `:path` is
+  applied with `get-in` after either.
+
+  `:*` means the value already is the state map — and takes `:path` too, since
+  a whole state map is as likely to sit nested inside a system map as a single
+  variable is."
+  [var- spec]
+  (let [{:keys [path] var-name :var} (v/state-spec! var- spec)
+        raw   (if (instance? clojure.lang.IDeref (deref var-))
+                (fn [] (deref (deref var-)))
+                (fn [] ((deref var-))))
         value (if (seq path) (fn [] (get-in (raw) path)) raw)]
     (if (= :* var-name)
-      {:fn raw :var v :supplies :*}
-      {:fn (fn [] {var-name (value)}) :var v :supplies var-name})))
+      {:fn value :var var- :supplies :*}
+      {:fn (fn [] {var-name (value)}) :var var- :supplies var-name})))
 
 (defn- lifecycle
   "An `init` or `halt` entry as replay wants it: called with no arguments."
-  [v]
-  {:fn (fn [] ((deref v))) :var v})
+  [var-]
+  {:fn (fn [] ((deref var-))) :var var-})
 
 (defn- claims
   "The drivers an annotation names, as a set, or nil when it names none. A
@@ -82,68 +80,38 @@
   (let [[ka kg ks ki kh kd]
         (map #(annotation-key key-ns %) [:action :args :state :init :halt :driver])
 
-        annotated (filter (fn [[_ v]]
-                            (let [m (var-meta v)]
+        annotated (filter (fn [[_ var-]]
+                            (let [m (var-meta var-)]
                               (or (contains? m ka) (contains? m ks)
                                   (get m ki) (get m kh))))
                           (ns-interns ns-sym))]
-    (when (empty? annotated)
-      (fail :empty-scan
-            (str ns-sym " is in :scan but carries no " key-ns "/* annotations."
-                 " The usual cause is metadata on the (defn ...) form, which"
-                 " Clojure discards: write (defn ^{...} name ...) or"
-                 " (defn name {...} ...) instead.")
-            {:ns ns-sym :key-ns key-ns}))
-    ;; A scoped annotation asks a question an unnamed driver cannot answer, and
-    ;; guessing it either way is the silence this design refuses.
+    (v/annotated! ns-sym key-ns annotated)
     (when (nil? driver-name)
-      (when-let [scoped (seq (keep (fn [[_ v]] (when (get (var-meta v) kd) v)) annotated))]
-        (fail :unnamed-driver
-              (str (first scoped) " is scoped with " (annotation-key key-ns :driver)
-                   " but this driver has no :name, so there is nothing to match"
-                   " it against. Give the driver map a :name, or drop the scope.")
-              {:ns ns-sym :vars (vec scoped) :key-ns key-ns})))
+      (v/matchable! ns-sym key-ns kd
+                    (keep (fn [[_ var-]] (when (get (var-meta var-) kd) var-)) annotated)))
     (reduce
-     (fn [acc [_ v]]
-       (let [m (var-meta v)]
+     (fn [acc [_ var-]]
+       (let [m (var-meta var-)]
          (cond-> acc
-           (contains? m ka) (update :actions conj [(get m ka) (action-handler v m kg)])
-           (contains? m ks) (update :readers conj (reader v (get m ks)))
-           (get m ki)       (update :inits conj (lifecycle v))
-           (get m kh)       (update :halts conj (lifecycle v)))))
+           (contains? m ka) (update :actions conj [(get m ka) (action-handler var- m kg)])
+           (contains? m ks) (update :readers conj (reader var- (get m ks)))
+           (get m ki)       (update :inits conj (lifecycle var-))
+           (get m kh)       (update :halts conj (lifecycle var-)))))
      {:actions [] :readers [] :inits [] :halts []}
-     (filter (fn [[_ v]] (mine? (var-meta v) kd driver-name)) annotated))))
-
-(defn- no-duplicates! [error what pairs]
-  (doseq [[k group] (group-by first pairs)
-          :when (< 1 (count group))]
-    (fail error
-          (str "two vars claim the same " what " " (pr-str k) ": "
-               (str/join ", " (sort (map #(str (:var (second %))) group))))
-          {:name k :vars (mapv #(:var (second %)) group)})))
-
-(defn- only
-  "The single lifecycle annotation of its kind in the whole scan, or nil.
-
-  Two of them is an error rather than first-one-wins. The loser would simply
-  never run, and an `init` that never runs is the worst shape a failure can
-  take here: it surfaces as a divergence in some later trace, at a step that
-  has nothing to do with the var that was skipped."
-  [error k found]
-  (when (< 1 (count found))
-    (fail error
-          (str "two vars claim " k ": "
-               (str/join ", " (sort (map #(str (:var %)) found))))
-          {:name k :vars (mapv :var found)}))
-  (first found))
+     (filter (fn [[_ var-]] (mine? (var-meta var-) kd driver-name)) annotated))))
 
 (defn- normalize-actions
   "Driver-map actions are bare functions of the picks map and win over the scan."
   [m]
   (reduce-kv (fn [acc k f] (assoc acc k {:fn f :var nil})) {} m))
 
-(defn- normalize-state [m]
-  (mapv (fn [[k f]] {:fn (fn [] {k (f)}) :var nil :supplies k}) m))
+(defn- normalize-state
+  "Driver-map state entries are 0-arg functions of one spec variable. They are
+  marked as overrides: replay exempts them from the duplicate check a `:*`
+  reader can only be caught by there, because overriding a reader is exactly
+  what they are for."
+  [m]
+  (mapv (fn [[k f]] {:fn (fn [] {k (f)}) :var nil :supplies k :override? true}) m))
 
 (defn resolve-driver
   "Build the resolved driver from a driver map.
@@ -165,17 +133,21 @@
 
   Throws `ex-info` with `:quint/error` `:empty-scan`, `:unnamed-driver`,
   `:duplicate-action`, `:duplicate-state`, `:duplicate-init`,
-  `:duplicate-halt` or `:ambiguous-arity`."
+  `:duplicate-halt`, `:ambiguous-arity`, `:bad-arglist` or `:bad-state-spec`.
+
+  Two readers that each name one variable are `:duplicate-state` here. A `:*`
+  reader names nothing, so an overlap involving one is only knowable once it
+  has been called, and `replay/run-trace` raises it instead."
   [{:keys [scan key-ns actions state] driver-name :name :or {key-ns 'quint} :as m}]
   (let [scanned    (map #(scan-ns key-ns driver-name %) scan)
         act-pairs  (mapcat :actions scanned)
         readers    (mapcat :readers scanned)
         overridden (set (keys state))]
-    (no-duplicates! :duplicate-action "action" act-pairs)
-    (no-duplicates! :duplicate-state "state variable"
-                    (keep (fn [r] (when (not= :* (:supplies r)) [(:supplies r) r])) readers))
-    (let [init (only :duplicate-init (annotation-key key-ns :init) (mapcat :inits scanned))
-          halt (only :duplicate-halt (annotation-key key-ns :halt) (mapcat :halts scanned))]
+    (v/no-duplicates! :duplicate-action "action" act-pairs)
+    (v/no-duplicates! :duplicate-state "state variable"
+                      (keep (fn [r] (when (not= :* (:supplies r)) [(:supplies r) r])) readers))
+    (let [init (v/only :duplicate-init (annotation-key key-ns :init) (mapcat :inits scanned))
+          halt (v/only :duplicate-halt (annotation-key key-ns :halt) (mapcat :halts scanned))]
       (-> (dissoc m :scan :state)
           (assoc :actions (merge (into {} act-pairs) (normalize-actions actions))
                  :readers (into (vec (remove #(contains? overridden (:supplies %)) readers))

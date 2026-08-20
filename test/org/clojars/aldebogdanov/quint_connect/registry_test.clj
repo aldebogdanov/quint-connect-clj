@@ -166,6 +166,86 @@
     (is (= #'restart/start! (get-in d [:init :var])))
     (is (= #'restart/stop! (get-in d [:halt :var])))))
 
+(deftest an-arglist-that-cannot-name-picks-is-rejected
+  ;; All three of these used to resolve. keyword returns nil rather than
+  ;; throwing on a destructuring form, so the pick name became nil, the lookup
+  ;; returned nil, and the handler ran on nils — a divergence with nothing
+  ;; attached to it saying why.
+  (testing "destructuring, which is the :actions calling convention and not this one"
+    (let [e (try (registry/resolve-driver
+                  {:scan [(fixture :destructured)]})
+                 (catch clojure.lang.ExceptionInfo ex ex))]
+      (is (= :bad-arglist (:quint/error (ex-data e))))
+      (is (str/includes? (ex-message e) "transfer"))
+      (is (str/includes? (ex-message e) ":actions")
+          "the message must name where a picks-map handler does belong")))
+
+  (testing "a rest parameter"
+    (let [e (try (registry/resolve-driver
+                  {:scan [(fixture :variadic)]})
+                 (catch clojure.lang.ExceptionInfo ex ex))]
+      (is (= :bad-arglist (:quint/error (ex-data e))))
+      (is (str/includes? (ex-message e) ":quint/args"))))
+
+  (testing "no :arglists at all, which is what def + fn leaves behind"
+    (let [e (try (registry/resolve-driver
+                  {:scan [(fixture :no-arglists)]})
+                 (catch clojure.lang.ExceptionInfo ex ex))]
+      (is (= :bad-arglist (:quint/error (ex-data e))))
+      (is (str/includes? (ex-message e) "defn")
+          "0 arities is the symptom; def + fn is the cause")))
+
+  (testing "and a var that holds no function is told so, not counted as arities"
+    (let [e (try (registry/resolve-driver
+                  {:scan [(fixture :not-a-function)]})
+                 (catch clojure.lang.ExceptionInfo ex ex))]
+      (is (= :bad-arglist (:quint/error (ex-data e))))
+      (is (str/includes? (ex-message e) "not a function")))))
+
+(deftest a-state-annotation-that-would-go-unread-is-rejected
+  (testing "an unknown key, which is the misspelling that supplied nil"
+    (let [e (try (registry/resolve-driver
+                  {:scan [(fixture :state-unknown-key)]})
+                 (catch clojure.lang.ExceptionInfo ex ex))]
+      (is (= :bad-state-spec (:quint/error (ex-data e))))
+      (is (str/includes? (ex-message e) ":variable") "name the key that was ignored")))
+
+  (testing "no :var, so no spec variable is named"
+    (let [e (try (registry/resolve-driver
+                  {:scan [(fixture :state-no-var)]})
+                 (catch clojure.lang.ExceptionInfo ex ex))]
+      (is (= :bad-state-spec (:quint/error (ex-data e))))
+      (is (str/includes? (ex-message e) ":quint/state :balances")
+          "the message must show the form that works")))
+
+  (testing "and a path that is not a vector, which threw IllegalArgumentException"
+    (let [e (try (registry/resolve-driver
+                  {:scan [(fixture :state-bad-path)]})
+                 (catch clojure.lang.ExceptionInfo ex ex))]
+      (is (= :bad-state-spec (:quint/error (ex-data e))))
+      (is (str/includes? (ex-message e) "vector of keys")))))
+
+(deftest a-pick-whose-value-is-a-record-may-be-destructured
+  ;; Two different intentions produce the same arglist: destructuring the picks
+  ;; map, which is :actions' convention, and destructuring one pick whose value
+  ;; is a record, which :quint/args has always covered. Nothing can tell them
+  ;; apart from the arglist alone, so :bad-arglist names both.
+  (let [d (registry/resolve-driver
+           {:scan [(fixture :record-pick)]})
+        h (get-in d [:actions "recv"])]
+    (is (= ["a" 1] ((:fn h) {:m {:from "a" :body 1}}))
+        "the destructuring applies to the pick's value, not to the picks map")))
+
+(deftest a-whole-state-reader-takes-a-path-too
+  ;; :* supplies every variable at once, and that map is as likely to sit
+  ;; nested inside a system map as a single variable is.
+  (let [d (registry/resolve-driver
+           {:scan [(fixture :star-nested)]})
+        r (first (:readers d))]
+    (is (= :* (:supplies r)))
+    (is (= {:balances {"alice" 1} :pending 2} ((:fn r)))
+        "the path is applied, and the surrounding system map is not compared")))
+
 (deftest duplicate-action-message-names-both-vars
   (let [e (try (registry/resolve-driver
                 {:scan [(fixture :duplicate)]})

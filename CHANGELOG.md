@@ -6,7 +6,55 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
-Nothing since 0.3.0.
+Targets **0.4.0**: the changes below reject annotations that 0.3.0 accepted and
+then failed to read, so a driver that resolved before may now throw. That is
+the point — every one of these was a divergence with no cause attached to it —
+but it is a breaking change and gets a minor bump rather than a patch.
+
+### Added
+
+- `:bad-arglist` — an `:quint/action` whose arglist cannot name picks. Three
+  cases, three messages: a destructuring parameter, a rest parameter, and no
+  `:arglists` at all. The last one distinguishes `(def f (fn ...))`, which
+  records none, from a var that holds no function, which cannot handle an
+  action at all; 0.3.0 called both of those "has 0 arities".
+- `:bad-state-spec` — a `:quint/state` map that would go partly unread: an
+  unknown key, a missing `:var`, or a `:path` that is not a vector.
+- `:path` on a `:*` reader. A whole state map is as likely to sit nested inside
+  a system map as a single variable is — which is the shape a Choreo-style
+  spec's per-node state arrives in — so `{:var :* :path [:app :state]}` now
+  reads the map from there instead of ignoring the path.
+
+### Changed
+
+- `registry` split: the checks moved to `registry.validation`, leaving
+  `registry` with the reading — `ns-interns`, `meta`, `deref` — and validation
+  with what the reading is allowed to mean. 278 lines became 157 and 159.
+  Nothing in validation reflects, so the rule confining reflection to
+  `registry` is unchanged. Private namespace, no public API moves.
+
+### Fixed
+
+- **A destructuring handler silently received nil.** `keyword` returns nil
+  rather than throwing on a destructuring form, so `(defn transfer
+  {:quint/action "transfer"} [{:keys [from to amount]}] ...)` resolved, ran,
+  and bound every pick to nil. Now `:bad-arglist`, naming the driver map's
+  `:actions` as the place a picks-map handler does belong. A variadic handler
+  bound its rest parameter the same way.
+- **A misspelled key in a `:quint/state` map silently dropped the variable.**
+  `{:variable :balances}` left `:var` nil, so the reader supplied `{nil ...}`,
+  and since only the trace's own variables are compared, that spec variable was
+  never checked and nothing said so. Now `:bad-state-spec`.
+- **A `:path` that was not a vector threw `IllegalArgumentException`**, with no
+  `:quint/error` on it. The decoder had this guard; the registry did not.
+- **Two `:*` readers supplying one variable resolved silently**, with the
+  winner decided by `ns-interns` hash order rather than by anything the author
+  wrote. It is now `:duplicate-state`, raised by `replay/run-trace` rather than
+  at construction: a `:*` reader declares nothing, so what it covers is only
+  knowable once it has been called, and calling readers at construction — before
+  `:quint/init` has run — is worse than the bug. Driver-map `:state` entries
+  carry `:override?` and are exempt, because replacing a reader is what they
+  are for.
 
 ## [0.3.0] — 2026-08-18
 

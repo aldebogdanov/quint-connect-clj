@@ -6,14 +6,27 @@
 (defn- fail [error msg data]
   (throw (ex-info msg (assoc data :quint/error error))))
 
+(defn- reader-name
+  "How to name a reader in a message. A driver-map `:state` entry has no var."
+  [v]
+  (if v (str v) "an entry in the driver map's :state"))
+
 (defn- read-state
   "Call every reader and merge the partial state maps they return. Yields
   [state provenance], where provenance maps each spec variable to the var of
   the reader that supplied it — taken from what the readers actually returned,
-  so a `:*` reader needs to declare nothing."
+  so a `:*` reader needs to declare nothing.
+
+  Two readers supplying one variable is `:duplicate-state`. The registry
+  catches that at construction for a reader that names its variable; a `:*`
+  reader names nothing, so what it covers is only knowable here, after it has
+  been called. Readers marked `:override?` are exempt and come last: replacing
+  a reader is what a driver-map `:state` entry is for.
+
+  Throws `:state-read-failed` and `:duplicate-state`."
   [readers]
   (reduce
-   (fn [[state prov] {f :fn v :var}]
+   (fn [[state prov] {f :fn v :var override? :override?}]
      (let [m (try (f)
                   (catch Exception e
                     (fail :state-read-failed
@@ -23,6 +36,15 @@
          (fail :state-read-failed
                (str "state reader did not return a map" (when v (str ": " v)))
                {:reader v :returned m}))
+       (when-not override?
+         (doseq [k (keys m)
+                 :when (contains? prov k)]
+           (fail :duplicate-state
+                 (str "two state readers both supply " (pr-str k) ": "
+                      (reader-name (get prov k)) " and " (reader-name v)
+                      ". A :* reader covers whatever it returns, which is why"
+                      " this is not caught at driver construction.")
+                 {:name k :vars [(get prov k) v]})))
        [(merge state m) (reduce #(assoc %1 %2 v) prov (keys m))]))
    [{} {}] readers))
 
@@ -107,6 +129,8 @@
 
     {:actions {\"deposit\" {:fn f :var v}}   f takes the picks map
      :readers [{:fn f :var v}]              f takes no arguments -> partial state
+                                            :override? true exempts it from the
+                                            duplicate check, for driver-map state
      :init    {:fn f :var v}                optional, takes nothing; before step 0
      :halt    {:fn f :var v}                optional, run in a finally
      :ignore  #{:lastError}                 spec variables not compared
@@ -122,7 +146,8 @@
   is a value, not an exception.
 
   Throws `ex-info` with `:quint/error` for a broken setup: `:no-init`,
-  `:unknown-action`, `:anonymous-action`, `:state-read-failed`."
+  `:unknown-action`, `:anonymous-action`, `:state-read-failed`,
+  `:duplicate-state`."
   [driver trace]
   (try
     (replay-states driver (:states trace))

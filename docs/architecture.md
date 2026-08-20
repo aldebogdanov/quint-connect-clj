@@ -63,6 +63,7 @@ and artifact (`org.clojars.aldebogdanov/quint-connect`).
 | ------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `…quint-connect.itf`      | pure       | ITF JSON -> EDN. Decode `#bigint`/`#map`/`#set`/`#tup`, records, sum types. Normalize variable names, split out `mbt::` metadata. |
 | `…quint-connect.registry` | reflective | Read `:quint/*` metadata from an explicit list of namespaces; produce driver data. The only namespace that reflects.              |
+| `…quint-connect.registry.validation` | pure | Decide whether what the registry read can be used, and say why not. Reflects over nothing.                        |
 | `…quint-connect.replay`   | engine     | Run the loop: init, act, read, compare. No I/O of its own.                                                                        |
 | `…quint-connect.report`   | pure       | Result data -> string. Diffs, step context, coverage, reproduce hints.                                                            |
 | `…quint-connect.quint`    | impure     | Build and run `quint` commands, collect the ITF files they emit.                                                                  |
@@ -70,10 +71,17 @@ and artifact (`org.clojars.aldebogdanov/quint-connect`).
 | `…quint-connect.test`     | glue       | `clojure.test` integration, and the one place that writes a failing trace to disk.                                                |
 | `…quint-connect.cli`      | impure     | `-main` for generating and caching traces outside a test run (M8).                                                                |
 
-Eight namespaces, none of which application code ever loads. If one passes
+Nine namespaces, none of which application code ever loads. If one passes
 ~200 lines, that is a signal to stop and reconsider, not to split it reflexively.
 
-Two have passed it. `itf` stands at 230 and `quint` at 264.
+Two have passed it. `itf` stands at 241 and `quint` at 264.
+
+`registry` reached 278 when `:bad-arglist` and `:bad-state-spec` were added,
+and was split rather than accepted, because this one had a seam worth an extra
+file: `registry` reads — `ns-interns`, `meta`, `deref` — and
+`registry.validation` decides what the reading is allowed to mean. Nothing in
+validation reflects, which is why the rule confining reflection to `registry`
+still reads the way it did. The halves are 157 and 159 lines.
 
 `itf` was accepted at 230 on the condition that M7b not grow it, and M7b did
 not: Apalache's dialect decodes through it unchanged, and `#unserializable`
@@ -104,7 +112,7 @@ mechanics, all verified against Clojure 1.12.5 by
 | `{:quint/args [:who :amount]}`                | function var                | pick names in argument order; defaults to `:arglists`; **required** for multi-arity |
 | `{:quint/state :balances}`                    | function var / `IDeref` var | supplies the value of that spec variable                                            |
 | `{:quint/state {:var :lastError :path [:e]}}` | function var / `IDeref` var | supplies it from a nested position                                                  |
-| `{:quint/state :*}`                           | function var / `IDeref` var | supplies a whole map of spec variables, merged                                      |
+| `{:quint/state :*}`                           | function var / `IDeref` var | supplies a whole map of spec variables, merged; takes `:path` too                                      |
 | `{:quint/init true}`                          | function var                | start or reset the application; run once per trace, before step 0                   |
 | `{:quint/halt true}`                          | function var                | stop it; run after every trace, in a `finally`                                      |
 | `{:quint/driver :ledger}`                     | any annotated var           | scope it to the driver(s) named; absent means every driver                          |
@@ -193,7 +201,9 @@ that. Nothing in the application changes.
 
 Resolution by var value: `IDeref` (atom, ref, agent, delay, volatile) is
 dereferenced; a function is called with no arguments; `:path` is applied with
-`get-in` afterwards. Metadata is read from the var and from the reference
+`get-in` afterwards. `:*` takes a `:path` like any other variable — a whole
+state map is as likely to sit nested inside a system map as a single variable
+is, which is the shape a Choreo-style spec's per-node state arrives in. Metadata is read from the var and from the reference
 object, with the var winning on conflict.
 
 Readers are called fresh for every comparison — once per step. There is no
@@ -290,7 +300,8 @@ downstream of the registry knows that metadata exists.
 
 - `:empty-scan` — a namespace in `:scan` yielded no annotations. Almost always
   the `^{...} (defn ...)` trap; the message says so.
-- `:duplicate-action`, `:duplicate-state` — two vars claim the same name. A
+- `:duplicate-action`, `:duplicate-state` — two vars claim the same name, for
+  readers that name one. A
   driver-map `:actions` or `:state` entry replacing one of them does **not**
   suppress this. The annotations are still ambiguous, and quietly picking a
   winner is the failure this layer exists to prevent; the override says which
@@ -300,6 +311,14 @@ downstream of the registry knows that metadata exists.
   option here: the loser would never run, and an `init` that never runs
   reappears as a divergence in a later trace that has nothing to do with it.
 - `:ambiguous-arity` — multi-arity var without `:quint/args`.
+- `:bad-arglist` — an action whose arglist cannot name picks: a destructuring
+  parameter, a rest parameter, or no `:arglists` to read at all, which is what
+  `(def f (fn ...))` leaves behind and what annotating a var that holds no
+  function looks like from here. Every parameter is a pick name, and a
+  parameter with no name would arrive as nil on every step.
+- `:bad-state-spec` — a `:quint/state` map that would go partly unread: an
+  unknown key, a missing `:var`, a `:path` that is not a vector, or a `:path`
+  alongside `:*`.
 - `:unnamed-driver` — a var scoped with `:quint/driver` in a driver that has no
   `:name` to match it against. See
   [0009](decisions/0009-driver-scope.md).
@@ -308,6 +327,13 @@ At replay time, because each of these needs the trace: `:no-init` (it starts
 with an action nothing is annotated for), `:unknown-action`,
 `:anonymous-action`, `:state-read-failed`, plus a coverage report of handlers
 the traces never exercised.
+
+`:duplicate-state` is raised in **both** places. A reader that names its
+variable is checked at construction; a `:*` reader names nothing, so what it
+covers is only knowable after it has been called, and calling readers at
+construction — before `:quint/init` has run — is worse than the bug it would
+catch. Driver-map `:state` entries are marked `:override?` and exempt: replacing
+a reader is what they are for.
 
 A spec variable that no reader supplies is **not** caught at construction. The
 driver never sees the spec, only the annotations, so the first trace is what
@@ -444,8 +470,8 @@ The keywords:
 :quint-not-found  :quint-failed  :no-traces  :test-failed  :bad-itf
 :bad-decode-path  :name-collision  :empty-scan  :duplicate-action
 :duplicate-state  :duplicate-init  :duplicate-halt  :ambiguous-arity
-:unnamed-driver  :no-init  :unknown-action  :anonymous-action
-:state-read-failed  :save-failed
+:bad-arglist  :bad-state-spec  :unnamed-driver  :no-init  :unknown-action
+:anonymous-action  :state-read-failed  :save-failed
 ```
 
 That list is the whole set, and it is checked against the source rather than
