@@ -156,6 +156,66 @@
                      (driver :readers [{:fn (fn [] :not-a-map) :var #'accounts}])
                      (trace "bank_run_0.itf.json"))))))
 
+(deftest overlapping-readers-are-caught-once-they-have-been-called
+  ;; The registry rejects two readers that each name one variable. A :* reader
+  ;; names nothing, so an overlap involving one is only visible here — and
+  ;; before this it silently resolved, with the winner decided by ns-interns
+  ;; hash order rather than by anything the author wrote.
+  (let [star  {:fn (fn [] {:balances @accounts :lastError @last-error}) :var #'accounts}
+        named {:fn #(hash-map :balances @accounts) :var #'last-error}
+        e     (try (replay/run-trace (driver :readers [star named])
+                                     (trace "bank_run_0.itf.json"))
+                   (catch clojure.lang.ExceptionInfo ex ex))]
+    (is (= :duplicate-state (:quint/error (ex-data e))))
+    (is (str/includes? (ex-message e) ":balances"))
+    (testing "and both readers are named, or it cannot be acted on"
+      (is (str/includes? (ex-message e) "accounts"))
+      (is (str/includes? (ex-message e) "last-error"))
+      (is (= 2 (count (:vars (ex-data e))))))))
+
+(deftest a-driver-map-state-entry-may-still-override-a-reader
+  ;; :override? is what keeps the documented precedence working: the driver
+  ;; map wins over the scan, and that is not a collision.
+  (let [star     {:fn (fn [] {:balances @accounts :lastError @last-error}) :var #'accounts}
+        override {:fn #(hash-map :balances @accounts) :var nil
+                  :supplies :balances :override? true}
+        r        (replay/run-trace (driver :readers [star override])
+                                   (trace "bank_run_0.itf.json"))]
+    (is (:ok? r) "the override supplies :balances and nothing complains")))
+
+(deftest a-pick-the-trace-does-not-carry-is-rejected
+  ;; Before this it bound nil and the failure blamed the implementation for a
+  ;; state the picks had never reached.
+  (testing "named in :quint/args, which is where a typo hides best"
+    (let [e (try (replay/run-trace
+                  (driver :actions {"deposit"   {:fn deposit! :var #'deposit!
+                                                 :needs #{:wo :amount}
+                                                 :needs-from :quint/args}
+                                    "withdraw"  {:fn withdraw! :var #'withdraw!}
+                                    "overdraft" {:fn overdraft! :var #'overdraft!}})
+                  (trace "bank_run_0.itf.json"))
+                 (catch clojure.lang.ExceptionInfo ex ex))]
+      (is (= :bad-args (:quint/error (ex-data e))))
+      (is (= [:wo] (:missing (ex-data e))))
+      (is (str/includes? (ex-message e) ":quint/args") "which annotation to fix")
+      (testing "and the message says what the trace does carry"
+        (is (str/includes? (ex-message e) ":amount"))
+        (is (str/includes? (ex-message e) ":who")))))
+
+  (testing "or misspelled in the parameter list, which is the same nil"
+    (let [e (try (replay/run-trace
+                  (driver :actions {"deposit"   {:fn deposit! :var #'deposit!
+                                                 :needs #{:amont}
+                                                 :needs-from :arglist}
+                                    "withdraw"  {:fn withdraw! :var #'withdraw!}
+                                    "overdraft" {:fn overdraft! :var #'overdraft!}})
+                  (trace "bank_run_0.itf.json"))
+                 (catch clojure.lang.ExceptionInfo ex ex))]
+      (is (= :bad-arglist (:quint/error (ex-data e)))
+          "a different keyword, because a different annotation is wrong")
+      (is (= [:amont] (:missing (ex-data e))))
+      (is (str/includes? (ex-message e) "Rename the parameter")))))
+
 ;; --- a throwing handler is a result, not an exception ---------------------
 
 (deftest throwing-handler-is-reported
