@@ -26,6 +26,19 @@
   [driver]
   (select-keys driver [:key-fn :action-path :nondet-path]))
 
+(defn- opts!
+  "Options are Quint's knobs and nothing else. `:actions` and `:state` shape the
+  driver, and `driver` has already resolved them into the maps replay consumes
+  — arriving here they would replace those with raw functions and break
+  dispatch at the first step. Throws `:bad-options`."
+  [opts]
+  (when-some [k (some (set (keys opts)) [:actions :state])]
+    (throw (ex-info (str k " belongs in the driver map, not in the options to"
+                         " check: it shapes the driver, and the driver has"
+                         " already been resolved.")
+                    {:quint/error :bad-options :key k})))
+  opts)
+
 (defn- replay-json [driver json]
   (replay/run-trace driver (itf/itf->trace (itf/json->itf json) (decode-opts driver))))
 
@@ -66,7 +79,7 @@
   Throws whatever `quint/run!` and `replay/run-trace` throw: generation and
   setup problems are exceptions, divergence is this map."
   [driver opts]
-  (replay-all driver (quint/run! (merge driver opts))))
+  (replay-all driver (quint/run! (merge driver (opts! opts)))))
 
 (defn check-run
   "Replay one scripted Quint `run` against the implementation.
@@ -84,7 +97,7 @@
   A scripted run is a scenario a human wrote down: use it for the case that
   must keep working, and `check` for the cases nobody thought of."
   [driver opts]
-  (replay-all driver (quint/test! (merge driver opts))))
+  (replay-all driver (quint/test! (merge driver (opts! opts)))))
 
 (defn verify
   "Check an invariant with Apalache, and replay the counterexample if there is
@@ -116,7 +129,7 @@
 
   Throws whatever `quint/verify!` and `replay/run-trace` throw."
   [driver opts]
-  (let [o (merge driver opts)
+  (let [o (merge driver (opts! opts))
         {:keys [holds? cmd dir traces]} (quint/verify! o)
         base {:seed nil :cmd cmd :dir dir}]
     (if holds?

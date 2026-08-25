@@ -6,7 +6,31 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
-Nothing since 0.5.1.
+### Added
+
+- `:bad-options` — `:actions` or `:state` passed to `check`, `check-run` or
+  `verify` in the options rather than the driver map. They shape the driver,
+  and the driver has already been resolved: merged in there they replaced the
+  resolved maps with raw functions and dispatch died at step 0 with nothing
+  pointing back at the option that did it.
+
+### Fixed
+
+- **Deleting the scratch directory followed symbolic links out of it.**
+  `file-seq` descends them, and Apalache runs in that directory. Verified both
+  ways against a link pointing at a directory outside: the old shape emptied
+  it, the new one does not. Deletion also says so on stderr now if anything
+  survives, rather than discarding every `.delete` result — it runs in a
+  `finally` and must not replace the result on its way out, so it warns instead
+  of throwing.
+- **`save-failure!`'s `:name` accepted a path.** A separator in it wrote
+  outside the directory `:dir` named. Now `:save-failed`, pointing at `:dir` as
+  the option that does mean that.
+- **`:quint/args` was not checked against the parameter list.** Too many or too
+  few entries reached the handler as an `ArityException` at some step of some
+  trace, with the annotation nowhere in the message. Now `:bad-args` at driver
+  construction. Skipped for multi-arity and variadic handlers, where the count
+  says nothing.
 
 ## [0.5.1] — 2026-08-21
 
