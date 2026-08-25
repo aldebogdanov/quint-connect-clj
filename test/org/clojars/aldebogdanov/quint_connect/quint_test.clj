@@ -77,6 +77,26 @@
     (is (= 3 (count (:traces (quint/run! {:spec spec :main "bankTest" :seed 1
                                           :traces 3 :max-steps 3})))))))
 
+(deftest ^:integration backend-selects-the-evaluator
+  ;; The default evaluator leaks bignumber.js internals for |n| >= 10^15, which
+  ;; dev/fixtures/bigint.qnt exists to record. :backend is the way around it, so
+  ;; the test is that the two evaluators disagree in the file and agree after
+  ;; decoding -- exactly what itf-test asserts of the committed pair.
+  (let [run-with (fn [backend]
+                   (-> (quint/run! (cond-> {:spec "dev/fixtures/bigint.qnt"
+                                            :seed 1 :traces 1 :max-samples 1
+                                            :max-steps 1}
+                                     backend (assoc :backend backend)))
+                       :traces first :json))
+        chosen  (run-with :typescript)
+        default (run-with nil)]
+    (testing "the raw encodings differ, which is the quirk itself"
+      (is (str/includes? default "\"s\":") "the default evaluator writes {s, e, c}")
+      (is (not (str/includes? chosen "\"s\":")) ":typescript writes #bigint"))
+    (testing "and both decode to the same numbers"
+      (is (= (:states (itf/itf->trace (itf/json->itf chosen)))
+             (:states (itf/itf->trace (itf/json->itf default))))))))
+
 (deftest ^:integration temp-directories-are-cleaned
   (let [before (set (.list (io/file (System/getProperty "java.io.tmpdir"))))]
     (quint/run! {:spec spec :main "bankTest" :seed 3 :traces 1 :max-steps 3})

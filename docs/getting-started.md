@@ -368,6 +368,8 @@ If `quint` collides with something, a driver can move all six at once with
    :actions {"transfer" (fn [picks] ...)}     ; wins over the scan
    :state   {:pending (fn [] ...)}            ; wins over the scan
 
+   :backend :typescript                       ; --backend; evaluator for check,
+                                              ; model checker for verify
    :action-path [:lastAction]                 ; for traces with no mbt:: — see §7
    :nondet-path [:lastPick]
    :key-fn  (fn [full-name] ...)})            ; variable name -> keyword

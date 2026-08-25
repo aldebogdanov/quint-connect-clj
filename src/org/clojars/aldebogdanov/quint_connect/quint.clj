@@ -85,10 +85,17 @@
        (sort-by #(parse-long (or (re-find #"\d+" (.getName ^java.io.File %)) "0")))
        (mapv (fn [f] {:name (.getName ^java.io.File f) :json (slurp f)}))))
 
+;; `--backend` names different things per command: the evaluator for `run` and
+;; `test` (`typescript` or `rust`, default `rust`), the model checker for
+;; `verify` (`apalache` or `tlc`). The value is passed through and Quint rejects
+;; a wrong one, rather than keeping a second copy of an enum that is Quint's to
+;; change. It is worth exposing because the default evaluator has recorded
+;; quirks -- integers >= 10^15 come out as bignumber.js internals, and a large
+;; negative literal fails at runtime. See notes/itf-format.md "Large integers".
 (defn- run-args
   "Quint runs in the spec's own directory and writes into `out-dir`, so sibling
   modules resolve and `#meta.source` stays a bare filename."
-  [{:keys [spec main init-action step-action seed traces max-samples max-steps]} out-dir]
+  [{:keys [spec main init-action step-action seed traces max-samples max-steps backend]} out-dir]
   (cond-> ["run" (.getName (io/file spec))
            "--mbt"
            (str "--seed=" seed)
@@ -97,6 +104,7 @@
            (str "--out-itf=" out-dir "/run_{seq}.itf.json")
            "--verbosity=0"]
     main        (conj (str "--main=" main))
+    backend     (conj (str "--backend=" (name backend)))
     init-action (conj (str "--init=" init-action))
     step-action (conj (str "--step=" step-action))
     ;; --max-samples is attempts, --n-traces is traces written: different
@@ -109,11 +117,12 @@
   "`quint test` has no `--mbt` and no `--n-traces`: one scripted run yields one
   trace. `--match` is a regex, anchored here so `depositTest` cannot also
   select `depositTestTwo`."
-  [{:keys [spec main test seed max-samples]} out-dir]
+  [{:keys [spec main test seed max-samples backend]} out-dir]
   (cond-> ["test" (.getName (io/file spec))
            (str "--out-itf=" out-dir "/test_{test}_{seq}.itf.json")
            "--verbosity=0"]
     main        (conj (str "--main=" main))
+    backend     (conj (str "--backend=" (name backend)))
     test        (conj (str "--match=^" test "$"))
     seed        (conj (str "--seed=" seed))
     max-samples (conj (str "--max-samples=" max-samples))))
@@ -122,11 +131,12 @@
   "`quint verify` takes the spec by absolute path, because unlike `run` and
   `test` it is invoked from the scratch directory rather than the spec's own.
   See `in-scratch!` for why."
-  [{:keys [spec main invariant init-action step-action max-steps]} out-dir]
+  [{:keys [spec main invariant init-action step-action max-steps backend]} out-dir]
   (cond-> ["verify" (.getAbsolutePath (io/file spec))
            (str "--out-itf=" out-dir "/verify.itf.json")
            "--verbosity=0"]
     main        (conj (str "--main=" main))
+    backend     (conj (str "--backend=" (name backend)))
     invariant   (conj (str "--invariant=" invariant))
     init-action (conj (str "--init=" init-action))
     step-action (conj (str "--step=" step-action))
@@ -167,8 +177,8 @@
   "Generate traces with `quint run --mbt`.
 
   Takes the driver map's Quint keys: `:spec` (required), `:main`,
-  `:init-action`, `:step-action`, `:seed`, `:traces`, `:max-steps` and
-  `:max-samples`. A missing `:seed` is generated so a failure is reproducible.
+  `:init-action`, `:step-action`, `:seed`, `:traces`, `:max-steps`,
+  `:max-samples` and `:backend`. A missing `:seed` is generated so a failure is reproducible.
   `:max-samples` is attempts and `:traces` is traces written; Quint requires
   the former to be at least the latter, so `:traces` acts as its floor.
 
@@ -202,7 +212,7 @@
   "Run one scripted Quint `run` through `quint test` and read its trace back.
 
   Takes `:spec` and `:test` (both required), plus the optional `:main`,
-  `:seed` and `:max-samples`. `:test` is the name of a `run` in the spec and is
+  `:seed`, `:max-samples` and `:backend`. `:test` is the name of a `run` in the spec and is
   matched exactly. Returns the same shape as `run!`
 
     {:seed 42 :dir \"/path/to/spec\" :cmd [\"quint\" ...]
@@ -244,7 +254,8 @@
   "Check an invariant with `quint verify`, which runs Apalache.
 
   Takes `:spec` and `:invariant` (both required), plus the optional `:main`,
-  `:init-action`, `:step-action` and `:max-steps`. Returns
+  `:init-action`, `:step-action`, `:max-steps` and `:backend` — which selects
+  the *model checker* here (`:apalache` or `:tlc`), not the evaluator. Returns
 
     {:holds? true  :cmd [\"quint\" ...] :dir \"/path/to/spec\" :traces []}
     {:holds? false :cmd [\"quint\" ...] :dir \"/path/to/spec\"
