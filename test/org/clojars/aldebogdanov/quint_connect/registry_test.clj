@@ -264,6 +264,15 @@
       (is (= #{:p :q :r} (get-in d [:actions "deep" :needs])))
       (is (= #{:pa :b} (get-in d [:actions "vecWithMap" :needs]))))))
 
+(deftest args-must-have-one-entry-per-parameter
+  ;; Too many or too few reached the handler as an ArityException at some step
+  ;; of some trace, with the annotation nowhere in the message.
+  (let [e (try (registry/resolve-driver
+                {:scan [(fixture :args-count)]})
+               (catch clojure.lang.ExceptionInfo ex ex))]
+    (is (= :bad-args (:quint/error (ex-data e))))
+    (is (str/includes? (ex-message e) "one entry per argument"))))
+
 (deftest a-shape-that-cannot-be-composed-is-rejected
   (testing "a set, which nothing destructures positionally"
     (let [e (try (registry/resolve-driver

@@ -47,6 +47,15 @@
     (is (= (str (io/file dir "overdraft.itf.json"))
            (get-in saved [:failure :saved])))))
 
+(deftest a-name-with-a-path-in-it-is-refused
+  ;; :dir chooses where; :name chooses what it is called. A separator in the
+  ;; name would write outside the directory the caller named, which is not a
+  ;; thing to find out from a file in an unexpected place.
+  (let [e (try (qt/save-failure! diverged {:name "../escaped.itf.json"})
+               (catch clojure.lang.ExceptionInfo ex ex))]
+    (is (= :save-failed (:quint/error (ex-data e))))
+    (is (str/includes? (ex-message e) ":dir") "and say which option does mean that")))
+
 (deftest a-passing-result-writes-nothing
   (let [dir    (str (io/file (temp-dir) "failures"))
         result {:ok? true :seed 42 :traces 5 :failure nil}]

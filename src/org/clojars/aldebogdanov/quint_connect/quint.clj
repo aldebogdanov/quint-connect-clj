@@ -54,9 +54,30 @@
 (defn- temp-dir! []
   (str (Files/createTempDirectory "quint-connect-" (into-array FileAttribute []))))
 
-(defn- delete-tree! [dir]
-  (doseq [f (reverse (file-seq (io/file dir)))]
-    (.delete ^java.io.File f)))
+(defn- under
+  "Everything under `dir`, deepest first, not descending into symbolic links.
+
+  `file-seq` descends them, and Apalache runs in this directory: a link it left
+  behind pointing anywhere else would be followed out of the scratch tree and
+  emptied."
+  [^java.io.File dir]
+  (reverse
+   (tree-seq #(and (.isDirectory ^java.io.File %)
+                   (not (Files/isSymbolicLink (.toPath ^java.io.File %))))
+             #(seq (.listFiles ^java.io.File %))
+             dir)))
+
+(defn- delete-tree!
+  "Delete the scratch directory. Says so on stderr rather than throwing if
+  anything survives: this runs in a `finally`, and a leftover temp directory
+  must not replace the result — or the exception — that was on its way out."
+  [dir]
+  (let [d (io/file dir)]
+    (doseq [^java.io.File f (under d)]
+      (.delete f))
+    (when (.exists d)
+      (.println System/err
+                (str "quint-connect: could not delete the scratch directory " d)))))
 
 (defn- collect [dir]
   (->> (.listFiles (io/file dir))

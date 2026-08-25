@@ -486,7 +486,7 @@ The keywords:
 :quint-not-found  :quint-failed  :no-traces  :test-failed  :bad-itf
 :bad-decode-path  :name-collision  :empty-scan  :duplicate-action
 :duplicate-state  :duplicate-init  :duplicate-halt  :ambiguous-arity
-:bad-arglist  :bad-args  :bad-state-spec  :unnamed-driver  :no-init
+:bad-arglist  :bad-args  :bad-options  :bad-state-spec  :unnamed-driver  :no-init
 :unknown-action  :anonymous-action  :state-read-failed  :save-failed
 ```
 

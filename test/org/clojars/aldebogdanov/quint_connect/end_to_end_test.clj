@@ -54,6 +54,19 @@
 
 ;; --- replay needs no quint ------------------------------------------------
 
+(deftest driver-shaping-keys-are-refused-in-the-options
+  ;; The options are Quint's knobs. :actions and :state shape the driver, and
+  ;; the driver has already been resolved -- merged in here they would replace
+  ;; the resolved maps with raw functions, and dispatch would die at step 0
+  ;; with nothing pointing back at the option that did it. Throws before quint
+  ;; is ever called, so this needs none installed.
+  (doseq [k [:actions :state]]
+    (let [e (try (q/check bank {:traces 1 k {}})
+                 (catch clojure.lang.ExceptionInfo ex ex))]
+      (is (= :bad-options (:quint/error (ex-data e))))
+      (is (= k (:key (ex-data e))))
+      (is (str/includes? (ex-message e) "driver map")))))
+
 (deftest committed-trace-replays-without-quint
   (let [r (q/replay-file bank "dev/fixtures/bank_run_0.itf.json")]
     (is (:ok? r))

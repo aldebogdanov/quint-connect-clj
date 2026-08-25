@@ -61,7 +61,7 @@
   [var- m args-key]
   (let [declared (get m args-key)
         args     (if declared
-                   (v/args! var- declared)
+                   (v/args! var- declared (:arglists (meta var-)))
                    (v/pick-names! var- (:arglists (meta var-))))]
     {:fn         (fn [picks] (apply @var- (map #(arg-value picks %) args)))
      :var        var-

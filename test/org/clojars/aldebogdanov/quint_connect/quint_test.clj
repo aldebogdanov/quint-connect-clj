@@ -7,7 +7,26 @@
             [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [org.clojars.aldebogdanov.quint-connect.itf :as itf]
-            [org.clojars.aldebogdanov.quint-connect.quint :as quint]))
+            [org.clojars.aldebogdanov.quint-connect.quint :as quint])
+  (:import (java.nio.file Files)
+           (java.nio.file.attribute FileAttribute)))
+
+(deftest scratch-deletion-does-not-follow-a-link-out
+  ;; Apalache runs in the scratch directory. file-seq descends symbolic links,
+  ;; so the previous version emptied whatever a link pointed at -- verified by
+  ;; running it against exactly this fixture before the fix.
+  (let [tmp     #(str (Files/createTempDirectory % (into-array FileAttribute [])))
+        scratch (tmp "scratch-")
+        outside (tmp "precious-")
+        keep    (io/file outside "do-not-delete.txt")]
+    (spit keep "important")
+    (spit (io/file scratch "trace.itf.json") "{}")
+    (Files/createSymbolicLink (.toPath (io/file scratch "link"))
+                              (.toPath (io/file outside))
+                              (into-array FileAttribute []))
+    (#'quint/delete-tree! scratch)
+    (is (not (.exists (io/file scratch))) "the scratch directory still goes")
+    (is (.exists keep) "but nothing on the other side of the link does")))
 
 (def ^:private spec "dev/fixtures/bank.qnt")
 

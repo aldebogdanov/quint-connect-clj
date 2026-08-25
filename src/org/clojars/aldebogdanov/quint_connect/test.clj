@@ -64,6 +64,14 @@
   discover as an `IOException` in place of the divergence that caused it."
   ([result] (save-failure! result nil))
   ([result {:keys [dir] fname :name}]
+   ;; A name is a file name. One with a separator in it would write somewhere
+   ;; other than the directory the caller named, which is not a thing to
+   ;; discover from a file that turned up in an unexpected place.
+   (when (and fname (re-find #"[/\\]" fname))
+     (fail :save-failed
+           (str ":name must be a file name, not a path; got " (pr-str fname)
+                ". Use :dir to choose where it goes.")
+           {:name fname}))
    (if-let [{:keys [json at] auto :name} (artifact result)]
      (let [f (io/file (or dir default-failure-dir) (or fname auto))]
        (try

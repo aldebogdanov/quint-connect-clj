@@ -115,13 +115,23 @@
   A pick name is a leaf; vectors and maps nest as deeply as the handler takes
   them apart. Map keys are literal, map values are shapes in their own right.
 
-  Throws `:bad-args`."
-  [v args]
+  Throws `:bad-args`, including when the count does not match the parameter
+  list — one entry per argument is the whole contract, and getting it wrong
+  reaches the handler as an `ArityException` at some step of some trace."
+  [v args arglists]
   (when-not (vector? args)
     (fail :bad-args
           (str v " has :quint/args " (pr-str args) ", and :quint/args must be a"
                " vector, one entry per argument, as in [:who :amount].")
           {:var v :args args}))
+  (let [arglist (when (= 1 (count arglists)) (first arglists))]
+    (when (and arglist
+               (not-any? #{'&} arglist)
+               (not= (count args) (count arglist)))
+      (fail :bad-args
+            (str v " takes " (count arglist) " argument(s) but :quint/args names "
+                 (count args) ". There is one entry per argument.")
+            {:var v :args args :arglist arglist})))
   (run! #(template! v args %) args)
   args)
 
