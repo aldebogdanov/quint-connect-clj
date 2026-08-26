@@ -1,4 +1,4 @@
-{:paths ["src"]
+{:paths ["src" "resources"]
 
  ;; data.json is the only runtime dependency. See docs/decisions/0004-quint-cli.md.
  :deps {org.clojure/clojure   {:mvn/version "1.12.5"}

@@ -49,7 +49,7 @@
                  [:license
                   [:name "Eclipse Public License 2.0"]
                   [:url "https://www.eclipse.org/legal/epl-2.0/"]]]]})
-  (b/copy-dir {:src-dirs ["src"] :target-dir class-dir})
+  (b/copy-dir {:src-dirs ["src" "resources"] :target-dir class-dir})
   (b/jar {:class-dir class-dir :jar-file jar-file})
   (println "wrote" jar-file))
 

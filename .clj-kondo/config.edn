@@ -1,3 +1,7 @@
+;; This config lints *this* repository. The copy consumers get ships in the jar
+;; at resources/clj-kondo.exports/, and carries the :lint-as below and nothing
+;; else — the exclusions further down are ours.
+;;
 ;; `defdriver` is `(def name (driver m))` and nothing more, but clj-kondo
 ;; cannot know that without expanding the macro, so every driver name reads as
 ;; an unresolved symbol at its use sites. Linting it as `def` is the whole fix;

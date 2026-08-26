@@ -1,0 +1,12 @@
+;; Shipped inside the jar. clj-kondo reads exported configs off the classpath,
+;; so a consumer gets this without configuring anything.
+;;
+;; `defdriver` is `(def name (driver m))` and nothing more, but clj-kondo
+;; cannot know that without expanding the macro, so without this every driver
+;; name reads as an unresolved symbol at each of its use sites — in the very
+;; deftest the library exists to make possible.
+;;
+;; Deliberately only this. Linting the `:quint/*` annotations themselves would
+;; mean hooking `clojure.core/defn`, which would run on every defn in a
+;; consumer's project to serve a handful of them. See docs/roadmap.md §M8.
+{:lint-as {org.clojars.aldebogdanov.quint-connect.core/defdriver clojure.core/def}}
