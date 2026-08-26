@@ -8,6 +8,17 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ### Added
 
+- `:backend` in the driver map, passed to `--backend`. It names different
+  things per command — the evaluator for `check` and `check-run`
+  (`:typescript` or `:rust`), the model checker for `verify` (`:apalache` or
+  `:tlc`) — and the value is passed through rather than validated against a
+  copy of an enum that is Quint's to change.
+
+  Worth having because the default evaluator has quirks this repo already
+  recorded: integers of absolute value `>= 10^15` come out as bignumber.js
+  internals, and a large negative literal fails at runtime. Until now there was
+  no way around either from the driver map.
+
 - `:bad-options` — `:actions` or `:state` passed to `check`, `check-run` or
   `verify` in the options rather than the driver map. They shape the driver,
   and the driver has already been resolved: merged in there they replaced the

@@ -266,6 +266,7 @@ touch application code.
    :main        "bankTest"                  ; optional --main module
    :init-action "init"                      ; optional --init action name
    :step-action "step"                      ; optional --step action name
+   :backend     :typescript                 ; optional --backend; see below
 
    ;; --- where the annotations are ---------------------------------------
    :scan     '[bank.core bank.system bank.model-test]   ; required'd, then read
@@ -287,6 +288,15 @@ touch application code.
 
    :key-fn      (fn [full-name] ...)})      ; variable name -> keyword
 ```
+
+`:backend` is passed through to whichever command runs, and names different
+things in each: the evaluator for `check` and `check-run` (`:typescript` or
+`:rust`, Quint's default being `rust`), the model checker for `verify`
+(`:apalache` or `:tlc`). Quint rejects a wrong value rather than this keeping a
+second copy of an enum that is Quint's to change. It is worth reaching for when
+the default evaluator's recorded quirks bite — integers of absolute value
+`>= 10^15`, and large negative literals — both in
+[notes/itf-format.md](notes/itf-format.md) §"Large integers".
 
 Handlers written in `:actions` take the **picks map**, not positional arguments,
 because a complex case usually wants to destructure it. Annotated functions take
