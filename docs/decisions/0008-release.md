@@ -69,6 +69,12 @@ into any test task. Someone types it, having read what is about to go out.
 
 - The version lives in `build.clj`. `CHANGELOG.md` says what is in it; a
   release is a commit that changes both, plus a `v<version>` git tag.
+- `bb release <version>` makes those edits, and the six coordinate files that
+  repeat the version, in one step. It refuses a version that is already in
+  `build.clj` and a `[Unreleased]` section with nothing under it — the two
+  mistakes that have actually happened here. It stops at the edits: it does
+  not commit, tag, push or deploy, and it prints those four commands instead.
+  Publishing stays a human step for the reason above.
 - `bb install` puts the jar in `~/.m2`, which is how a consumer coordinate gets
   tested before anything is published. That check is worth running: it is the
   difference between "the tests pass" and "the artifact works".

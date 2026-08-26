@@ -15,6 +15,7 @@ the cost of legibility will be turned down even when it is correct.
 bb test        # replay only
 bb test:all    # everything except the Apalache tests
 bb test:verify # the Apalache tests, minutes
+bb release 0.6.0   # bump the version everywhere; publishing stays manual
 ```
 
 The `bb` tasks are [babashka](https://babashka.org/), which is a convenience
