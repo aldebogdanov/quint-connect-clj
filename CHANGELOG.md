@@ -6,7 +6,29 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cross-file imports do work**, and `notes/itf-format.md` said they did not.
+  The form is `import lib.* from "./lib"` — the path without the extension. The
+  note called the "sibling modules resolve" rationale in `quint.clj` untestable
+  because of it; it is testable, and true. Corrected by running it.
+
+- **The Choreo entry in the roadmap was inference and is now a recording.**
+  Choreo's own `two_phase_commit.qnt` run under `--mbt` says
+  `mbt::actionTaken` is `"step"` on every step, that the picks carry both the
+  acting process and the whole chosen transition, and that all state is one
+  variable. A Choreo spec can therefore drive an implementation through a
+  single driver-map `:actions` entry — which the entry previously said it
+  could not.
+
 ### Added
+
+- `bb release <version>` — bumps `build.clj`, opens a dated CHANGELOG section
+  and rewrites the six files that repeat the coordinate, in one step. Refuses a
+  version already in `build.clj`, and an `[Unreleased]` section with nothing
+  under it. It stops at the edits and prints the commit, tag, push and deploy
+  commands rather than running them: publishing stays a human step, and the
+  reason is in [0008](docs/decisions/0008-release.md).
 
 - **A clj-kondo config ships in the jar.** `defdriver` is `(def name (driver
   m))`, which clj-kondo cannot know without expanding the macro, so every

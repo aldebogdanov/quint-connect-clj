@@ -244,25 +244,52 @@ turn comes; none is committed to now.
 
 - **Choreo support, end to end.** A later release, and the biggest single thing
   missing. [Choreo](https://github.com/informalsystems/choreo/) is where the
-  Quint ecosystem is pointed, and a Choreo spec does not drive an
-  implementation as it stands. Recorded rather than guessed, from `choreo.qnt`:
+  Quint ecosystem is pointed. **Recorded on 2026-08-26** by running Choreo's own
+  `two_phase_commit.qnt` under `--mbt`, replacing what this entry used to infer:
 
-  ```quint
-  action step(listener, apply_custom_effect): bool = {
-    nondet v = oneOf(processes)
-    process_transitions(v, listener(convert_context(s, v)).filter(...), apply_custom_effect)
-  }
+  ```
+  vars: ["two_phase_commit::choreo::s", "mbt::actionTaken", "mbt::nondetPicks"]
+
+  index 1  actionTaken: "step"
+           picks: {v: Some("p3"),
+                   transition: Some({post_state: {process_id: "p3",
+                                                  role: Participant,
+                                                  stage: Aborted},
+                                     effects: Set()})}
   ```
 
-  A transition is **data** — `{post_state, effects}` — applied by one generic
-  action, so `mbt::actionTaken` is `process_transitions` on every step. There is
-  no name to dispatch on and no variable recording one, which is why Quint's own
-  docs say a Choreo spec must be "instrumented slightly". The picks do carry the
-  acting process.
+  Three things follow, and only the first was guessed right before.
 
-  The pieces exist: `:action-path` and `:nondet-path` for the instrumented
-  names, and `{:var :* :path [...]}` for state nested under `choreo::s.system`,
-  which is the same narrowing the Rust port's `Config.state` does. What is
-  missing is that none of it has been run: no example, no fixture, and a model
-  where the implementation is N processes rather than one application. Until an
-  `examples/choreo/` exists and is green, this section is inference and says so.
+  1. `mbt::actionTaken` is `"step"` on **every** step. One name, so nothing
+     dispatches on it. (The earlier guess said `process_transitions`; it is the
+     outer action, not the inner one.)
+  2. The picks are richer than expected: they carry the acting process **and**
+     the whole chosen transition. But a transition is `{post_state, effects}` —
+     an outcome, with no name anywhere in it.
+  3. All state is one variable, `s`, holding `{events, extensions, messages,
+     system}`, with `system` a map of process to local state.
+
+  So a Choreo spec **can** drive an implementation, and not the way this entry
+  assumed. Since every step is `"step"`, one driver-map entry catches all of
+  them and receives both picks:
+
+  ```clojure
+  :actions {"step" (fn [{:keys [v transition]}] ...)}   ; node, and its post-state
+  ```
+
+  and the mapping from an outcome back to the operation that produces it is
+  adaptation in the test namespace, which is where this design already says
+  adaptation belongs. State comes back through one reader supplying `:s`.
+
+  What this does **not** reach is dispatch by transition *name*, because Choreo
+  records none. The instrumentation Quint's docs mention would put a name in
+  the local state — and `:action-path` could not read it there anyway, because
+  it is a static `get-in` path and the node that acted is a *pick*, different on
+  every step. Letting `:action-path` and `:nondet-path` take a function of the
+  decoded state and picks, not only a vector, is the change that would close
+  that. Noted, not committed to.
+
+  What is genuinely left is the example: a Clojure two-phase commit and the
+  adapter above, green. It needs Choreo's four `.qnt` files vendored — 30 KB,
+  Apache-2.0, so attribution rather than a licence problem — and vendoring is a
+  dependency decision that wants its own ADR under the rule in CLAUDE.md.
