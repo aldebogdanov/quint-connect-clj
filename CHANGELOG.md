@@ -30,6 +30,13 @@ follow [semantic versioning](https://semver.org/) from its first release.
   commands rather than running them: publishing stays a human step, and the
   reason is in [0008](docs/decisions/0008-release.md).
 
+  It rewrites the coordinate specifically, not every occurrence of the old
+  version: `io.github.cognitect-labs/test-runner` is pinned by a git tag that
+  has already collided with one of ours, and a blanket replace turned it into a
+  tag that does not exist. Found by using the task to cut the release it
+  shipped in. A coordinate that stops matching aborts the release rather than
+  bumping half of it.
+
 - **A clj-kondo config ships in the jar.** `defdriver` is `(def name (driver
   m))`, which clj-kondo cannot know without expanding the macro, so every
   driver name read as an unresolved symbol in the consumer's own tests:
