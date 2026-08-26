@@ -224,13 +224,19 @@ turn comes; none is committed to now.
   its own `deps.edn`. **Later** — after the linter, which every user benefits
   from rather than only Kaocha users.
 - `clj-kondo` hooks so annotated vars and unknown `:quint/*` keys are linted.
-  **Wanted.** `.clj-kondo/config.edn` already lints `defdriver` as `def`, which
-  is what stops a driver name reading as unresolved. What it does not do is
-  look at the annotations: a misspelled `:quint/actoin`, a `:quint/args` shape
-  that cannot compose, an annotation stranded under the wrong `:key-ns`. The
-  last of those is the gap
+  **Half done.** The `defdriver` half shipped: the jar now carries a clj-kondo
+  export, so a consumer's linter stops reporting every driver name as an
+  unresolved symbol without them configuring anything. What is left is the annotations: a misspelled
+  `:quint/actoin`, a `:quint/args` shape that cannot compose, an annotation
+  stranded under the wrong `:key-ns`. The last of those is the gap
   [0007](decisions/0007-annotation-keys.md) accepts at runtime and a linter is
   the one place it could be closed without a namespace-similarity heuristic.
+
+  That half is not free, which is why it did not ship with the other. Metadata
+  on a `defn` is not a call, so the only hook that sees it is one on
+  `clojure.core/defn` — and an exported config carrying that would run on every
+  `defn` in a consumer's project to serve the handful that are annotated. If it
+  is built, it belongs behind a config a user opts into, not in the export.
 - Shrinking. Probably never: the first diverging step is already the minimal
   information, and dropping steps from a state machine trace produces traces the
   spec never generated.

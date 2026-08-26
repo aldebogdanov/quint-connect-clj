@@ -8,6 +8,20 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ### Added
 
+- **A clj-kondo config ships in the jar.** `defdriver` is `(def name (driver
+  m))`, which clj-kondo cannot know without expanding the macro, so every
+  driver name read as an unresolved symbol in the consumer's own tests:
+
+  ```
+  test/myapp/model_test.clj:7:14: error: Unresolved symbol: counter
+  ```
+
+  clj-kondo reads exported configs off the classpath, so this needs no setup
+  beyond the `--copy-configs` a consumer already runs. Linting the `:quint/*`
+  annotations is deliberately not in it — that would mean hooking
+  `clojure.core/defn` for every `defn` in a consumer's project. See
+  [roadmap](docs/roadmap.md) §M8.
+
 - `:backend` in the driver map, passed to `--backend`. It names different
   things per command — the evaluator for `check` and `check-run`
   (`:typescript` or `:rust`), the model checker for `verify` (`:apalache` or
