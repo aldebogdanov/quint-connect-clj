@@ -6,6 +6,21 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cross-file imports do work**, and `notes/itf-format.md` said they did not.
+  The form is `import lib.* from "./lib"` — the path without the extension. The
+  note called the "sibling modules resolve" rationale in `quint.clj` untestable
+  because of it; it is testable, and true. Corrected by running it.
+
+- **The Choreo entry in the roadmap was inference and is now a recording.**
+  Choreo's own `two_phase_commit.qnt` run under `--mbt` says
+  `mbt::actionTaken` is `"step"` on every step, that the picks carry both the
+  acting process and the whole chosen transition, and that all state is one
+  variable. A Choreo spec can therefore drive an implementation through a
+  single driver-map `:actions` entry — which the entry previously said it
+  could not.
+
 ### Added
 
 - `bb release <version>` — bumps `build.clj`, opens a dated CHANGELOG section
