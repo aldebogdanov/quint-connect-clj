@@ -6,6 +6,10 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
+Nothing since 0.6.0.
+
+## [0.6.0] — 2026-08-26
+
 ### Fixed
 
 - **Cross-file imports do work**, and `notes/itf-format.md` said they did not.
