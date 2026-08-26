@@ -185,11 +185,24 @@ printed unless `--verbosity=0` is also passed. Cost is spec-dependent and can be
 large: 5 s to confirm `nonNegative` on a two-action counter, 114 s to find a
 counterexample to `balances.get(a) <= 50` on the toy bank.
 
-**Unverified, and left that way.** `quint.clj` runs Quint in the spec's own
-directory partly "so sibling modules resolve". That rationale is untested: no
-form of `import lib.* from "./lib.qnt"` would load on 0.32.0 — not `./lib.qnt`,
-not `./lib`, not `lib`, with the imported file parsing fine on its own — so no
-working cross-file import could be built to test it either way. If M7b runs
+**Corrected 2026-08-26.** This said no form of cross-file import would load on
+0.32.0, so the "sibling modules resolve" rationale could not be tested. That
+was wrong, and the working form is `from "./lib"` — the path without the
+extension:
+
+```
+module usr {
+  import lib.* from "./lib"        // lib.qnt beside it
+  ...
+}
+```
+
+`n` runs 0, 1, 3, 7 under `n' = double(n) + 1`, so the imported definition
+resolved. Choreo's own files import each other exactly this way
+(`from "../../spells/basicSpells"`), which is what prompted re-checking it. So
+running Quint in the spec's own directory does have the effect the comment in
+`quint.clj` claims, and that comment is no longer resting on an untested
+assumption. If M7b runs
 `verify` from a scratch directory, this is the assumption it rests on.
 
 ## Large integers: a real trap
