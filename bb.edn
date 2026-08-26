@@ -1,4 +1,6 @@
-{:tasks
+{:paths ["dev"]
+
+ :tasks
  {test     {:doc  "Run tests that need no Quint installed"
             :task (shell "clojure -M:test -e :integration -e :slow")}
 
@@ -7,6 +9,10 @@
 
   test:verify {:doc  "Only the verify tests: these run Apalache and take minutes"
                :task (shell "clojure -M:test -i :slow")}
+
+  release  {:doc  "Bump the version everywhere for a release: bb release 0.6.0"
+            :requires ([release])
+            :task (apply release/-main *command-line-args*)}
 
   jar      {:doc  "Build the library jar into target/"
             :task (shell "clojure -T:build jar")}

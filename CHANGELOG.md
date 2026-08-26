@@ -8,6 +8,13 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ### Added
 
+- `bb release <version>` — bumps `build.clj`, opens a dated CHANGELOG section
+  and rewrites the six files that repeat the coordinate, in one step. Refuses a
+  version already in `build.clj`, and an `[Unreleased]` section with nothing
+  under it. It stops at the edits and prints the commit, tag, push and deploy
+  commands rather than running them: publishing stays a human step, and the
+  reason is in [0008](docs/decisions/0008-release.md).
+
 - `:backend` in the driver map, passed to `--backend`. It names different
   things per command — the evaluator for `check` and `check-run`
   (`:typescript` or `:rust`), the model checker for `verify` (`:apalache` or
