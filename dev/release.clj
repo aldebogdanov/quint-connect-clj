@@ -33,10 +33,29 @@
     (when-not (or (str/blank? body) (str/starts-with? body "Nothing since"))
       body)))
 
-(defn- edit! [path f]
+(defn- edit!
+  "Apply `f` to the file, write it back, and return the number of characters
+  that changed. Zero means the pattern was not found, which is worth knowing:
+  a coordinate that quietly stopped matching is how a release goes out half
+  bumped."
+  [path f]
   (let [before (slurp path), after (f before)]
     (spit path after)
-    (not= before after)))
+    (if (= before after) 0 1)))
+
+(defn- coordinate-edits
+  "The replacements a release makes in a file that repeats the version.
+
+  Targeted rather than a blanket search for the old version string: the
+  test-runner is pinned by a git tag that has collided with our own version
+  before, and a blind replace rewrote it into a tag that does not exist."
+  [from to]
+  [;; org.clojars.aldebogdanov/quint-connect {:mvn/version "X"} — the artifact
+   ;; and the version sit on one line in the README and on two in the tutorial
+   [(re-pattern (str "(quint-connect\\s*\\{:mvn/version \")" from "(\")"))
+    (str "$1" to "$2")]
+   [(str "Status: **" from "**.")        (str "Status: **" to "**.")]
+   [(str "**" from " is an early release.**") (str "**" to " is an early release.**")]])
 
 (defn -main [& [version]]
   (when-not (and version (re-matches #"\d+\.\d+\.\d+" version))
@@ -54,11 +73,14 @@
              % "## [Unreleased]\n\n"
              (format "## [Unreleased]\n\nNothing since %s.\n\n## [%s] — %s\n\n"
                      version version (str (java.time.LocalDate/now)))))
-    (doseq [f coordinate-files]
-      (edit! f #(str/replace % from version)))
-
-    (println (format "%s -> %s in build.clj, CHANGELOG.md and %d coordinate files.\n"
-                     from version (count coordinate-files)))
+    (let [edits (for [f coordinate-files]
+                  [f (reduce (fn [n [pat rep]] (+ n (edit! f #(str/replace % pat rep))))
+                             0 (coordinate-edits from version))])]
+      (doseq [[f n] edits]
+        (when (zero? n)
+          (die "no" from "coordinate found in" f "- the release would go out half bumped")))
+      (println (format "%s -> %s in build.clj, CHANGELOG.md and %d coordinate files.\n"
+                       from version (count edits))))
     (println "Read the diff, then:\n")
     (println "  bb test && bb test:all && bb install")
     (println (format "  git commit -am 'release: %s' && git tag -a v%s -m 'v%s'" version version version))
