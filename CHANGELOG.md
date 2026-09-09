@@ -6,6 +6,10 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
+Nothing since 0.6.1.
+
+## [0.6.1] — 2026-09-09
+
 ### Fixed
 
 - **A `halt` that throws no longer replaces the answer the run came for.** It
