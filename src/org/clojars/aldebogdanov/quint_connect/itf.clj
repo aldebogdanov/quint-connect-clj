@@ -13,7 +13,19 @@
 ;; seen to either, and only the ITF *reader* side of both accepts it. So there
 ;; is still nothing to decode against, and a fixture that looks about right is
 ;; not an option here — see CONTRIBUTING, "Fixtures are recordings".
-(def ^:private known-tags #{"#bigint" "#set" "#tup" "#map"})
+(def ^:private tag-shapes
+  "What ITF writes under each tag, as [predicate, how to say it]. The shape is
+  checked before anything decodes the payload: a corrupted `#bigint` is a
+  `ClassCastException` otherwise, and a corrupted `#tup` or `#map` is worse
+  still — it decodes to a mangled value that only diverges several steps later."
+  {"#bigint" [string? "a string"]
+   "#set"    [vector? "an array"]
+   "#tup"    [vector? "an array"]
+   "#map"    [#(and (vector? %)
+                    (every? (fn [e] (and (vector? e) (= 2 (count e)))) %))
+              "an array of two-element [key, value] arrays"]})
+
+(def ^:private known-tags (set (keys tag-shapes)))
 
 (defn- fail [error msg data]
   (throw (ex-info msg (assoc data :quint/error error))))
@@ -35,9 +47,9 @@
   (let [{:strs [s e c]} m]
     (and (= #{"s" "e" "c"} (set (keys m)))
          (map? s) (contains? #{"1" "-1"} (get s "#bigint"))
-         (map? e) (contains? e "#bigint")
+         (map? e) (string? (get e "#bigint"))
          (vector? c) (seq c)
-         (every? #(and (map? %) (contains? % "#bigint")) c))))
+         (every? #(and (map? %) (string? (get % "#bigint"))) c))))
 
 (defn- decode-bignumber
   "The {s, e, c} form Quint writes for |n| >= 10^15 under --backend=rust: the
@@ -59,6 +71,19 @@
         (.multiply (BigInteger/valueOf sign))
         ->int)))
 
+(defn- tagged!
+  "The payload under a known tag, refused unless it has the shape ITF writes.
+  Decoding a corrupted one is what turns a broken file into a
+  `ClassCastException`, or into a value that is quietly wrong."
+  [v tag]
+  (let [payload    (get v tag)
+        [ok? want] (get tag-shapes tag)]
+    (if (ok? payload)
+      payload
+      (fail :bad-itf
+            (str tag " carries " (pr-str payload) ", and ITF writes it as " want)
+            {:tag tag :value v}))))
+
 (defn- decode-value [v]
   (cond
     (map? v)
@@ -76,11 +101,11 @@
                           "https://github.com/aldebogdanov/quint-connect-clj/issues")))
               {:value v :supported known-tags})
 
-        (contains? v "#bigint") (decode-bigint (get v "#bigint"))
-        (contains? v "#set")    (into #{} (map decode-value) (get v "#set"))
-        (contains? v "#tup")    (mapv decode-value (get v "#tup"))
+        (contains? v "#bigint") (decode-bigint (tagged! v "#bigint"))
+        (contains? v "#set")    (into #{} (map decode-value) (tagged! v "#set"))
+        (contains? v "#tup")    (mapv decode-value (tagged! v "#tup"))
         (contains? v "#map")    (into {} (map (fn [[k x]] [(decode-value k) (decode-value x)]))
-                                      (get v "#map"))
+                                      (tagged! v "#map"))
         (bignumber? v)          (decode-bignumber v)
         ;; Records and sum-type variants are indistinguishable by shape, so a
         ;; variant stays {:tag "Busy" :value 2}; users reshape it in a reader.
@@ -106,11 +131,34 @@
              {:pick k :value v})))
    {} m))
 
+(defn- meta-index!
+  "The index a state records for itself, out of its `#meta`. Checked rather
+  than `get`-ed: a `#meta` that is not an object, or an index that is not an
+  integer, used to yield nil and surface much later as a failure report about
+  step nil.
+
+  A `#meta` carrying no index at all is not an error. ITF lets a producer put
+  what it likes in there, and there is no recording of one without an index to
+  hold that against — every trace from `quint run`, `quint test` and
+  `quint verify` carries one on every state."
+  [v]
+  (when-not (map? v)
+    (fail :bad-itf
+          (str "a state's #meta carries " (pr-str v) ", and ITF writes it as an object")
+          {:value v}))
+  (let [index (get v "index")]
+    (when-not (or (nil? index) (integer? index))
+      (fail :bad-itf
+            (str "a state's #meta index is " (pr-str index)
+                 ", and ITF writes it as an integer")
+            {:value v :index index}))
+    index))
+
 (defn- decode-state [key-fn state]
   (reduce-kv
    (fn [acc k v]
      (condp = k
-       "#meta"    (assoc acc :index (get v "index"))
+       "#meta"    (assoc acc :index (meta-index! v))
        action-var (assoc acc :action v)
        picks-var  (assoc acc :picks (decode-picks v))
        (assoc-in acc [:state (key-fn k)] (decode-value v))))

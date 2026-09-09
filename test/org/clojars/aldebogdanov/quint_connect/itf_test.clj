@@ -188,3 +188,47 @@
                       ["states" 0 "bankTest::bank::lastError"] rec)]
     (is (= {:s 1 :e 15 :c "not-a-chunk-list"}
            (get-in (itf/itf->trace ok) [:states 0 :state :lastError])))))
+
+;; A tag whose payload has the wrong shape is a broken file. `#bigint` and
+;; `#set` used to reach the JVM as a ClassCastException and an
+;; IllegalArgumentException; `#tup` and `#map` were worse, decoding to a
+;; quietly wrong value that only diverged several steps into a replay. No
+;; recording of a corrupted trace exists, so each case mutates a real one.
+
+(deftest corrupted-tag-payload-is-typed
+  (let [broke #(assoc-in (fixture "shapes_0.itf.json") ["states" 0 %1] %2)]
+    (testing "#bigint written as a JSON number"
+      (is (= :bad-itf (error-of #(itf/itf->trace (broke "aRec" {"x" {"#bigint" 7}}))))))
+
+    (testing "#set that is not an array"
+      (is (= :bad-itf (error-of #(itf/itf->trace (broke "aSet" {"#set" 7}))))))
+
+    (testing "#tup that is not an array"
+      (is (= :bad-itf (error-of #(itf/itf->trace (broke "aTup" {"#tup" "x"}))))))
+
+    (testing "#map whose entries are not [key, value] pairs"
+      (is (= :bad-itf (error-of #(itf/itf->trace
+                                  (broke "nested" {"#map" [[{"#bigint" "1"}]]}))))))
+
+    (testing "the message names the tag and what ITF writes there"
+      (is (str/includes? (try (itf/itf->trace (broke "aTup" {"#tup" "x"}))
+                              (catch clojure.lang.ExceptionInfo e (ex-message e)))
+                         "#tup carries \"x\", and ITF writes it as an array")))))
+
+(deftest corrupted-bignumber-is-typed
+  (let [bad (assoc-in (fixture "shapes_0.itf.json")
+                      ["states" 0 "aBigInt" "e" "#bigint"] 15)]
+    (is (= :bad-itf (error-of #(itf/itf->trace bad)))
+        "it stops being a bignumber and fails as the record it then looks like")))
+
+(deftest corrupted-state-meta-is-typed
+  (let [broke #(assoc-in (fixture "bank_run_0.itf.json") ["states" 1 "#meta"] %)]
+    (testing "#meta that is not an object"
+      (is (= :bad-itf (error-of #(itf/itf->trace (broke 7))))))
+
+    (testing "an index that is not an integer"
+      (is (= :bad-itf (error-of #(itf/itf->trace (broke {"index" "1"}))))))
+
+    (testing "a #meta carrying no index is left alone: ITF lets it carry anything"
+      (is (nil? (:index (get-in (itf/itf->trace (broke {"note" "hand-edited"}))
+                                [:states 1])))))))
