@@ -256,3 +256,38 @@
     (is (= 1 @halted))
     (error-of #(replay/run-trace (driver :halt h :init nil) (trace "bank_run_0.itf.json")))
     (is (= 2 @halted) "including when the setup was broken")))
+
+;; A halt in a `finally` replaced whatever the replay had already produced, so
+;; a cleanup failure hid the divergence the run existed to find.
+
+(deftest a-failing-halt-keeps-the-result
+  (let [h (fn [] (throw (IllegalStateException. "the pool would not close")))
+        e (try (replay/run-trace (driver :halt {:fn h :var #'reset-app!})
+                                 (trace "bank_run_0.itf.json"))
+               nil
+               (catch clojure.lang.ExceptionInfo e e))
+        d (ex-data e)]
+    (is (= :halt-failed (:quint/error d)))
+    (is (= #'reset-app! (:halt d)))
+    (is (:ok? (:result d)) "the replay's own answer survives the failed cleanup")
+    (is (instance? IllegalStateException (:cause d)))
+    (is (str/includes? (ex-message e) "the pool would not close"))))
+
+(deftest a-failing-halt-keeps-a-divergence
+  (let [leaky (driver :init {:fn #(reset! accounts {"alice" 99 "bob" 0}) :var nil}
+                      :halt {:fn (fn [] (throw (IllegalStateException. "boom"))) :var nil})
+        d     (try (replay/run-trace leaky (trace "bank_run_0.itf.json"))
+                   nil
+                   (catch clojure.lang.ExceptionInfo e (ex-data e)))]
+    (is (= :halt-failed (:quint/error d)))
+    (is (false? (:ok? (:result d))))
+    (is (= 0 (:step (:failure (:result d)))))))
+
+(deftest a-failing-halt-does-not-hide-a-broken-setup
+  (let [boom (IllegalStateException. "boom")
+        e    (try (replay/run-trace (driver :init nil :halt {:fn #(throw boom) :var nil})
+                                    (trace "bank_run_0.itf.json"))
+                  nil
+                  (catch clojure.lang.ExceptionInfo e e))]
+    (is (= :no-init (:quint/error (ex-data e))) "the setup error is the one raised")
+    (is (= [boom] (vec (.getSuppressed e))) "and the halt's is suppressed on it, not lost")))

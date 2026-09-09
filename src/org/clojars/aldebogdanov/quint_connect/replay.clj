@@ -160,6 +160,26 @@
                      (cond-> used (= :action kind) (update action (fnil inc 0)))
                      (inc steps)))))))))
 
+(defn- halt-name
+  "How to name the halt function in a message. A driver map may carry one with
+  no var behind it."
+  [driver]
+  (if-let [v (:var (:halt driver))] (str v) "the driver's :halt"))
+
+(defn- halt!
+  "Run the driver's `halt`, if any, and return what it threw, or nil.
+
+  It deliberately does not rethrow. In a `finally` a failing halt replaces
+  whatever the replay had already produced — the diverging step, the handler's
+  exception, a broken-setup `ex-info` — and only `run-trace` knows which of
+  those is the one worth reporting. `Throwable`, because an `Error` swallowed
+  by cleanup is exactly the loss this exists to prevent; it is surfaced either
+  way."
+  [driver]
+  (when-let [h (:halt driver)]
+    (try ((:fn h)) nil
+         (catch Throwable e e))))
+
 (defn run-trace
   "Replay one decoded trace against a resolved driver.
 
@@ -174,7 +194,8 @@
                                             :override? true exempts it from the
                                             duplicate check, for driver-map state
      :init    {:fn f :var v}                optional, takes nothing; before step 0
-     :halt    {:fn f :var v}                optional, run in a finally
+     :halt    {:fn f :var v}                optional, run after the trace,
+                                            whether it replayed or threw
      :ignore  #{:lastError}                 spec variables not compared
      :compare {:balances (fn [expected actual] ...)}}
 
@@ -189,9 +210,24 @@
 
   Throws `ex-info` with `:quint/error` for a broken setup: `:no-init`,
   `:unknown-action`, `:anonymous-action`, `:state-read-failed`,
-  `:duplicate-state`, `:bad-args`, `:bad-arglist`."
+  `:duplicate-state`, `:bad-args`, `:bad-arglist`.
+
+  A `halt` that throws never costs the caller the answer it came for. If the
+  replay produced a result, the failed halt is `:halt-failed`, carrying that
+  result under `:result` and the exception under `:cause`; if the replay threw,
+  that exception is the one raised and the halt's is added to it as a
+  suppressed exception."
   [driver trace]
-  (try
-    (replay-states driver (:states trace))
-    (finally
-      (when-let [h (:halt driver)] ((:fn h))))))
+  (let [[thrown result] (try [nil (replay-states driver (:states trace))]
+                             (catch Throwable e [e nil]))
+        halted          (halt! driver)]
+    (cond
+      (and thrown halted) (do (.addSuppressed ^Throwable thrown ^Throwable halted)
+                              (throw thrown))
+      thrown              (throw thrown)
+      halted              (fail :halt-failed
+                                (str (halt-name driver) " threw after the trace replayed: "
+                                     (ex-message halted)
+                                     ". What the replay itself found is under :result.")
+                                {:halt (:var (:halt driver)) :result result :cause halted})
+      :else               result)))

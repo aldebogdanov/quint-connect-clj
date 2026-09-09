@@ -115,7 +115,7 @@ mechanics, all verified against Clojure 1.12.5 by
 | `{:quint/state {:var :lastError :path [:e]}}` | function var / `IDeref` var | supplies it from a nested position                                                  |
 | `{:quint/state :*}`                           | function var / `IDeref` var | supplies a whole map of spec variables, merged; takes `:path` too                                      |
 | `{:quint/init true}`                          | function var                | start or reset the application; run once per trace, before step 0                   |
-| `{:quint/halt true}`                          | function var                | stop it; run after every trace, in a `finally`                                      |
+| `{:quint/halt true}`                          | function var                | stop it; run after every trace, replayed or thrown                                  |
 | `{:quint/driver :ledger}`                     | any annotated var           | scope it to the driver(s) named; absent means every driver                          |
 
 Keys are qualified by `quint` and require nothing
@@ -224,7 +224,7 @@ for each trace:
   for each following state:
     action handler with picks
     read state, compare
-  :quint/halt            in a finally
+  :quint/halt            after every trace
 ```
 
 ```clojure
@@ -497,7 +497,7 @@ The keywords:
 :bad-decode-path  :name-collision  :empty-scan  :duplicate-action
 :duplicate-state  :duplicate-init  :duplicate-halt  :ambiguous-arity
 :bad-arglist  :bad-args  :bad-options  :bad-state-spec  :unnamed-driver  :no-init
-:unknown-action  :anonymous-action  :state-read-failed  :save-failed
+:unknown-action  :anonymous-action  :state-read-failed  :halt-failed  :save-failed
 ```
 
 That list is the whole set, and it is checked against the source rather than
@@ -533,6 +533,7 @@ testing tool.
 | a spec variable no reader supplies                         | diverges against nothing on the first state carrying it; there is no `:missing-state` — see §5             |
 | `:quint/driver` naming a driver that does not exist        | **none** — indistinguishable from scoping to a driver not being built; accepted in [0009](decisions/0009-driver-scope.md) |
 | an `init` that does not fully reset leaks between traces   | state 0 is compared right after `init`; a leak fails immediately                                           |
+| a `halt` that throws over the run's own result             | `:halt-failed` carries that result under `:result`; a replay that threw is raised itself, halt suppressed  |
 | `init` per trace is expensive for a full system start      | documented; prefer a cheap reset function over `mount/start`                                               |
 | ghost vars surviving a REPL reload                         | registry rebuilt per run; unused-handler coverage report                                                   |
 | forgotten `require` hiding a handler                       | `:scan` is explicit and required'd; no classpath-wide scan                                                 |

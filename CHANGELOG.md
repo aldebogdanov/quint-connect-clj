@@ -6,7 +6,39 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
-Nothing since 0.6.0.
+### Fixed
+
+- **A `halt` that throws no longer replaces the answer the run came for.** It
+  ran in a `finally`, and on the JVM an exception from a `finally` discards
+  whatever was already on its way out — the diverging step, the handler's
+  exception, a broken-setup `ex-info`. A failing cleanup could therefore hide
+  the divergence the trace existed to find. Now: if the replay produced a
+  result, the failure is `:halt-failed` and carries that result under
+  `:result`; if the replay itself threw, that exception is the one raised and
+  the halt's is attached to it as a suppressed exception. Nothing is lost in
+  either direction.
+
+- **A corrupted tag payload is `:bad-itf`, not a JVM exception or a wrong
+  value.** The four ITF tags were decoded without checking the shape of what
+  they carried. `{"#bigint": 7}` reached the caller as a `ClassCastException`
+  and `{"#set": 7}` as an `IllegalArgumentException`; worse, `{"#tup": "x"}`
+  decoded to `[\x]` and `{"#map": [[1]]}` to `{1 nil}` — quietly wrong values
+  that only surfaced as a divergence several steps into a replay. The shape is
+  now checked before anything decodes it, and the message names the tag and
+  what ITF writes there. A bignumber whose `s`/`e`/`c` fields hold numbers
+  rather than strings stops matching the bignumber shape and fails the same
+  way.
+
+- **A corrupted state `#meta` is `:bad-itf` too.** `#meta` was read with a
+  plain `get`, so a `#meta` that was not an object, or an `index` that was not
+  an integer, gave `:index` nil — which surfaced far downstream as a failure
+  report about step nil. Both are now refused where they are read. A `#meta`
+  carrying no index at all is still accepted: ITF lets a producer put what it
+  likes there, and no recording of one without an index exists to hold that
+  against.
+
+The first two were found in third-party review of 0.6.0, the third while
+fixing them.
 
 ## [0.6.0] — 2026-08-26
 
