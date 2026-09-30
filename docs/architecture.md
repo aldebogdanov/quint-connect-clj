@@ -509,7 +509,7 @@ never a bare string or a bare `assert`:
 The keywords:
 
 ```clojure
-:quint-not-found  :quint-failed  :no-traces  :test-failed  :bad-itf
+:quint-not-found  :quint-too-old  :quint-failed  :no-traces  :test-failed  :bad-itf
 :bad-decode-path  :name-collision  :empty-scan  :duplicate-action
 :duplicate-state  :duplicate-init  :duplicate-halt  :ambiguous-arity
 :bad-arglist  :bad-args  :bad-options  :bad-state-spec  :unnamed-driver  :no-init

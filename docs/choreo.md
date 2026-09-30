@@ -257,8 +257,7 @@ operation:
    :scan       '[tpc.core tpc.model-test]
    :state-path [:s]
    :actions    {"step" step}
-   :ignore     #{:events :extensions}
-   :backend    :typescript})
+   :ignore     #{:events :extensions}})
 ```
 
 What it costs:
@@ -269,12 +268,10 @@ What it costs:
 - **Guessing.** Two transitions can have the same outcome — a participant that
   aborts on its own and one told to abort both end `Aborted` with no effects —
   and the handler has to pick one. An instrumented spec knows which it took.
-- **`:backend :typescript`, on Quint 0.32.0.** Its default rust evaluator can
-  label state 0 `"step"` once more than one trace is written, with the picks of
-  a step that never happened. A driver that handles `"step"` is then handed the
-  initial state before `init` has run. The typescript evaluator and Quint
-  0.33.0 do not do this; an instrumented spec is not affected either way,
-  because its action comes from the recording.
+- **Quint 0.33.0, at least** — which the library requires anyway. 0.32.0 could
+  label state 0 `"step"`, and a driver that handles `"step"` would then be
+  handed the initial state before `init` had run. See
+  [0014](decisions/0014-quint-floor.md).
 
 ## What does not work
 

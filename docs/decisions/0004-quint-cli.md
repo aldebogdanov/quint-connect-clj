@@ -1,6 +1,9 @@
 # 0004 — Shell out to the Quint CLI; keep dependencies near zero
 
-Status: accepted
+Status: accepted. Its version policy is **partially superseded** by
+[0014-quint-floor.md](0014-quint-floor.md): a Quint older than 0.33.0 is
+refused rather than warned about, and the tested version is 0.33.0. The rest
+stands.
 
 ## Decision
 

@@ -112,12 +112,7 @@
    :state-path [:s]
    :actions    {"step" step}
    ;; Choreo as written has no extensions to supply: type Extensions = ().
-   :ignore     #{:events :extensions}
-   ;; Quint 0.32.0's default evaluator can label state 0 "step" once more than
-   ;; one trace is written, and this driver claims "step", so the adapter would
-   ;; be handed the initial state. The typescript evaluator does not; see the
-   ;; mislabel test below and notes/itf-format.md §Choreo.
-   :backend    :typescript})
+   :ignore     #{:events :extensions}})
 
 (deftest choreo-as-written-replays-through-one-adapter
   (let [r (q/replay-file as-written "dev/fixtures/choreo/tpc_run_0.itf.json")]
@@ -125,16 +120,6 @@
     (is (= 6 (:steps r)))
     (is (= 5 (get-in r [:coverage :used "step"]))
         "and all the coverage report can say is \"step\"")))
-
-(deftest a-mislabelled-state-0-reaches-an-adapter-that-claims-step
-  ;; What the backend choice above avoids. Replay trusts the trace: a handler
-  ;; claiming the name at state 0 is called, and this one is handed a node and
-  ;; no transition, before init has run.
-  (let [r (q/replay-file as-written "dev/fixtures/choreo/tpc_mislabel_0.itf.json")
-        f (:failure r)]
-    (is (not (:ok? r)))
-    (is (= [0 "step" {:v "p1"}] [(:step f) (:action f) (:picks f)]))
-    (is (some? (:cause f)))))
 
 (deftest a-participant-that-ignores-an-abort-is-caught
   ;; The classic way to block two-phase commit: once a participant has voted

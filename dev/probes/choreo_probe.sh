@@ -9,7 +9,8 @@
 #   5. whether `quint verify` runs on a Choreo spec at all
 #   6. whether vendored imports resolve from somewhere other than the spec's own
 #      directory, which is where `verify` runs
-#   7. what state 0 says when Choreo as written runs to completion, per backend
+#   7. what state 0 says when Choreo as written runs to completion, per backend,
+#      which is the bug that made Quint 0.33.0 the floor
 #
 # Findings are written up in docs/roadmap.md §M9 and docs/notes/itf-format.md
 # §Choreo. Run this to check they still hold on a new Quint or a new Choreo.
@@ -134,5 +135,5 @@ labels = [json.load(open(f))['states'][0]['mbt::actionTaken'] for f in glob.glob
 print('   %-10s %s' % (sys.argv[1], ', '.join('%d x %s' % (labels.count(a), a) for a in sorted(set(labels)))))
 PY
 done
-echo '   -> rust labels most initial states "step", with the picks of an attempt'
-echo '      that was never taken; typescript labels every one "init"'
+echo '   -> every one "init" from Quint 0.33.0 on. On 0.32.0, rust labelled most of'
+echo '      them "step", with the picks of an attempt never taken (Quint #2012)'

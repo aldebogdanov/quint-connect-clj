@@ -1,6 +1,9 @@
 # Fixtures
 
-Recorded output of Quint 0.32.0, used as test data. Regenerate with
+Recorded output of Quint 0.32.0, used as test data. Every one was re-recorded
+on 0.33.0 on 2026-09-30 and came out identical but for `#meta` timestamps,
+except `choreo/tpc_mislabel_0.itf.json`, which records the bug 0.33.0 fixed —
+see [0014](../../docs/decisions/0014-quint-floor.md). Regenerate with
 `bb fixtures` (rewrites the recordings made with a fixed seed or a named test,
 `choreo/` included; the others are produced by the commands in
 [../../docs/notes/itf-format.md](../../docs/notes/itf-format.md)).

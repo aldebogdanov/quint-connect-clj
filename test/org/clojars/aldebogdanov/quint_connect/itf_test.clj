@@ -223,11 +223,10 @@
         (is (str/includes? (message g) ":action-path starts at :s"))))))
 
 (deftest quint-0-32-labels-state-0-of-choreo-as-written-with-step
-  ;; A quirk of Quint 0.32.0's default rust evaluator, recorded rather than
-  ;; worked around: with more than one trace, state 0 of Choreo's own 2PC can
-  ;; carry the step action and the picks of an attempt that was never taken.
-  ;; The typescript backend and Quint 0.33.0 both write "init". See
-  ;; notes/itf-format.md §Choreo.
+  ;; Why Quint 0.33.0 is the floor (decisions/0014). Recorded on 0.32.0, whose
+  ;; rust evaluator left a dead-ended sample's action and picks in storage,
+  ;; where the next sample's init could not overwrite them (Quint #2012). Replay
+  ;; dispatches state 0 by that label. 0.33.0 writes "init" in both traces.
   (let [[t0 t1] (map #(first (:states (trace % {:state-path [:s]})))
                      ["choreo/tpc_mislabel_0.itf.json" "choreo/tpc_mislabel_1.itf.json"])]
     (is (= ["step" {:v "p1"}] [(:action t0) (:picks t0)])

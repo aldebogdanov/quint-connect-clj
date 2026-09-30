@@ -47,6 +47,19 @@ follow [semantic versioning](https://semver.org/) from its first release.
   [`dev/probes/choreo_probe.sh`](dev/probes/choreo_probe.sh) to re-check what
   they show.
 
+### Changed
+
+- **Quint 0.33.0 or later is required**, and an older one is `:quint-too-old`
+  rather than a warning. 0.32.0 does not fail; it writes traces that decode
+  cleanly and are wrong. Its rust evaluator left a dead-ended sample's action
+  and picks in storage, where the next sample's `init` could not overwrite
+  them, so state 0 of later traces said `"step"` with picks no transition used
+  (Quint #2012, fixed in 0.33.0). A driver handling `"step"` itself — Choreo as
+  written — was handed the initial state instead of `init` running. Every
+  fixture re-recorded on 0.33.0 identically but for timestamps, except the one
+  that records the bug. CI installs 0.33.0, whose Apalache 0.62.1 needs Java 21.
+  See [0014](docs/decisions/0014-quint-floor.md).
+
 ### Fixed
 
 - **Paths that leave nothing to compare are refused instead of passing.**
@@ -62,13 +75,6 @@ follow [semantic versioning](https://semver.org/) from its first release.
 - `quint verify` fails on every Choreo spec with Quint 0.32.0 and 0.33.0:
   Apalache's type checker rejects it before any trace is written. `q/verify`
   reports it as `:quint-failed` with the output verbatim.
-- Quint 0.32.0's default rust evaluator can label state 0 `"step"` when it
-  writes more than one trace of a Choreo spec as written, with the picks of an
-  attempt that was never taken. The typescript backend and Quint 0.33.0 do
-  not. It matters only to a driver that handles `"step"` itself, which is why
-  the example in [docs/choreo.md](docs/choreo.md) for that route sets
-  `:backend :typescript`. Details in
-  [notes/itf-format.md](docs/notes/itf-format.md) §Choreo.
 
 ## [0.6.1] — 2026-09-09
 

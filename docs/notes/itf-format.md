@@ -1,7 +1,11 @@
 # What Quint actually emits
 
-Observed with **Quint 0.32.0** on 2026-08-13. Everything here was produced by
-running the CLI, not read from documentation. The files in
+Observed with **Quint 0.32.0** on 2026-08-13, and re-checked on **0.33.0** on
+2026-09-30: every fixture re-recorded identically but for `#meta` timestamps,
+except the state-0 bug 0.33.0 fixed, and `verify_probe.sh` reproduced its
+findings on Apalache 0.62.1 with the one change noted below. 0.33.0 is the
+floor; see [../decisions/0014-quint-floor.md](../decisions/0014-quint-floor.md).
+Everything here was produced by running the CLI, not read from documentation. The files in
 [`dev/fixtures/`](../../dev/fixtures/) are the recordings; regenerate with
 `bb fixtures`.
 
@@ -157,9 +161,10 @@ directory and leaves the spec's own alone. That is what lets it be contained:
 run `quint verify` in a scratch directory and it is deleted along with it.
 
 It cannot be renamed. `--apalache-config` with `common.out-dir` is ignored —
-relative or absolute, and `write-intermediate` with it — and a config file
-containing an unknown key still exits 0, so the file is not being validated and
-may not be forwarded at all. The name `_apalache-out` is Apalache's; only the
+relative or absolute, and `write-intermediate` with it. With Apalache 0.56.1
+a config file containing an unknown key still exited 0, so the file was not
+being validated and may not have been forwarded at all; Apalache 0.62.1, which
+Quint 0.33.0 fetches, rejects it. The name `_apalache-out` is Apalache's; only the
 directory it appears in is ours to choose.
 
 Its contents are logs, not results: `_apalache-out/server/<timestamp>/` holding
@@ -237,17 +242,22 @@ effect, so a participant already `Aborted` can take `AbortsAsInstructed` again.
 In 150 traces of 20 steps, 74% of steps changed neither `system` nor
 `messages`. The recorded seed-42 run spends four of its eight steps that way.
 
-**State 0 can say `"step"`.** Quint 0.32.0's default rust evaluator, writing
-more than one trace of Choreo's own spec, labels state 0 of most of them
-`"step"`, with picks `{v: Some("p1"), transition: None}` — an attempt that was
-never taken. The state itself is the initial one. Twenty traces at seed 42: 19
-say `"step"`. `--backend=typescript`: all 20 say `"init"`. Quint 0.33.0 with
-its evaluator 0.7.0: `"init"` in both traces of the smallest reproduction.
-Every one of those runs ends with all four nodes decided, where no transition
-is enabled, and the instrumented spec — which always has one enabled — never
-shows it; that it is tied to runs ending that way is inference. Fixture:
-`tpc_mislabel_0.itf.json` (`"step"`) and `tpc_mislabel_1.itf.json` (`"init"`),
-the two traces of one run.
+**On 0.32.0, state 0 could say `"step"`.** Quint 0.32.0's default rust
+evaluator, writing more than one trace of Choreo's own spec, labels state 0 of
+most of them `"step"`, with picks `{v: Some("p1"), transition: None}` — an
+attempt that was never taken. The state itself is the initial one. Twenty
+traces at seed 42: 19 say `"step"`. `--backend=typescript`: all 20 say
+`"init"`. It is not Choreo's: a bank whose step is `any { deposit, withdraw }`
+and which runs out of enabled actions does the same, with the label `"step"`
+rather than either inner action.
+
+The cause is Quint's own and is written down in the commit that fixed it for
+0.33.0 (`5b7a850a`, Quint #2012): a sample that ends because `step` found
+nothing enabled leaves the failed attempt's action and picks in storage, and
+recording is first-write-wins, so the next sample's `init` cannot overwrite
+them. Quint 0.33.0 labels every one `"init"`. That is why it is the floor.
+Fixture: `tpc_mislabel_0.itf.json` (`"step"`) and `tpc_mislabel_1.itf.json`
+(`"init"`), the two traces of one 0.32.0 run.
 
 **`quint verify` fails on every Choreo spec**, instrumented or not, with Quint
 0.32.0 / Apalache 0.56.1 and Quint 0.33.0 / Apalache 0.62.1:
@@ -282,7 +292,7 @@ come out as bignumber.js internals instead of `#bigint`:
 That is `9007199254740993`. The threshold is exact: `999999999999999` encodes
 correctly, `1000000000000000` does not. `--backend=typescript` encodes both
 correctly as `{"#bigint": "..."}`. Fixtures: `bigint_rust_0.itf.json`,
-`bigint_typescript_0.itf.json`.
+`bigint_typescript_0.itf.json`. Still so on 0.33.0: both re-record identically.
 
 **A JavaScript library in a Rust backend is not a contradiction, and the
 attribution above used to imply it was.** What is recorded here is only which

@@ -11,7 +11,14 @@
 (def tested-version
   "The Quint the fixtures were recorded from and the behaviour in
   docs/notes/itf-format.md was verified against."
-  "0.32.0")
+  "0.33.0")
+
+(def minimum-version
+  "The oldest Quint whose `--mbt` traces can be trusted. Before 0.33.0 the rust
+  evaluator could write a dead-ended sample's action and picks onto state 0 of
+  the next trace (Quint #2012), and replay dispatches state 0 by that label.
+  See docs/decisions/0014-quint-floor.md."
+  "0.33.0")
 
 (defn- fail [error msg data]
   (throw (ex-info msg (assoc data :quint/error error))))
@@ -42,9 +49,30 @@
       (fail :quint-failed "quint --version failed" {:exit exit :stderr err}))
     (str/trim out)))
 
+(defn- release
+  "A version string as three numbers, for ordering. Anything after them — a
+  pre-release suffix — is ignored."
+  [v]
+  (vec (take 3 (concat (map parse-long (re-seq #"\d+" v)) (repeat 0)))))
+
+(defn- floor!
+  "The version, if it is not older than `minimum-version`. Throws
+  `:quint-too-old` if it is: an older Quint does not fail, it writes traces
+  that replay wrongly, so warning is not enough."
+  [v]
+  (when (neg? (compare (release v) (release minimum-version)))
+    (fail :quint-too-old
+          (str "quint " v " is older than " minimum-version ", the oldest whose"
+               " --mbt traces can be trusted: before it, the rust evaluator could"
+               " label state 0 with a previous sample's action and picks. Upgrade"
+               " with npm i -g @informalsystems/quint@" tested-version
+               ". Replaying committed traces needs no Quint at all.")
+          {:version v :minimum minimum-version}))
+  v)
+
 (def ^:private checked-version
   (delay
-   (let [v (version)]
+   (let [v (floor! (version))]
      (when-not (= tested-version v)
        (.println System/err
                  (str "quint-connect: found quint " v ", developed against "

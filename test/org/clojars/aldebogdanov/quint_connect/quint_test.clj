@@ -33,6 +33,19 @@
 (defn- error-of [f]
   (try (f) nil (catch clojure.lang.ExceptionInfo e (:quint/error (ex-data e)))))
 
+(deftest an-older-quint-is-refused-not-warned-about
+  ;; 0.32.0 does not fail: it writes state 0 of some traces with the previous
+  ;; sample's action and picks. See dev/fixtures/choreo/tpc_mislabel_0.itf.json.
+  (let [floor! #'quint/floor!]
+    (is (= :quint-too-old (error-of #(floor! "0.32.0"))))
+    (is (= :quint-too-old (error-of #(floor! "0.9.99"))) "compared as numbers")
+    (is (= "0.33.0" (floor! "0.33.0")))
+    (is (= "0.40.1" (floor! "0.40.1")))
+    (is (= "1.0.0-rc1" (floor! "1.0.0-rc1")))
+    (is (str/includes? (try (floor! "0.32.0")
+                            (catch clojure.lang.ExceptionInfo e (ex-message e)))
+                       "npm i -g @informalsystems/quint@0.33.0"))))
+
 (deftest ^:integration reports-a-version
   (is (re-matches #"\d+\.\d+\.\d+" (quint/version))))
 

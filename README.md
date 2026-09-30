@@ -243,8 +243,9 @@ tree — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 - Clojure 1.12+ on the JVM. ClojureScript is out of scope
   ([decision](docs/decisions/0005-clojure-only.md)).
-- [Quint](https://github.com/informalsystems/quint) on `PATH` for trace
-  *generation* (developed against 0.32.0). Trace *replay* needs nothing but
+- [Quint](https://github.com/informalsystems/quint) **0.33.0 or later** on
+  `PATH` for trace *generation*; older versions are refused, for the reason in
+  [0014](docs/decisions/0014-quint-floor.md). Trace *replay* needs nothing but
   Clojure — cached ITF files run in CI without Quint installed.
 - Apalache (fetched by `quint verify`) only for the verification mode.
 - [babashka](https://babashka.org/) only to use this repository's `bb` tasks,

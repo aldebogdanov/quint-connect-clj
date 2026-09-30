@@ -17,14 +17,16 @@ Taken from commit `000cf4eed315187dc6f216a148781cff7dde6521` (2026-06-23).
 
 ## Recordings
 
-Quint 0.32.0, rust evaluator. `bb fixtures` regenerates them.
+Quint 0.32.0, rust evaluator, and identical on 0.33.0 apart from `#meta`
+timestamps — except the mislabel pair, which is why 0.33.0 is the floor. `bb
+fixtures` regenerates all but that pair, which 0.33.0 cannot reproduce.
 
 | file | what it is |
 | ---- | ---------- |
 | `tpc_run_0.itf.json` | Choreo as written, `quint run --mbt`, seed 42: `mbt::actionTaken` is `"step"` on every step, and the picks are a node and an outcome |
 | `tpc_tracked_run_0.itf.json` | instrumented, `quint run --mbt`, seed 42: carries both `mbt::` and the recorded transition, and four no-op `AbortsAsInstructed` steps |
 | `tpc_tracked_test_commitTest.itf.json` | instrumented, `quint test` of `commitTest`: no `mbt::` at all, and every transition named |
-| `tpc_mislabel_0/1.itf.json` | Choreo as written, `quint run --mbt`, seed 42, two traces: state 0 of trace 0 says `"step"` with picks `{v: Some("p1"), transition: None}`, and state 0 of trace 1 says `"init"`. A quirk of the default rust evaluator in Quint 0.32.0; the typescript backend and Quint 0.33.0 write `"init"` in both |
+| `tpc_mislabel_0/1.itf.json` | Choreo as written, `quint run --mbt`, seed 42, two traces: state 0 of trace 0 says `"step"` with picks `{v: Some("p1"), transition: None}`, and state 0 of trace 1 says `"init"`. Quint 0.32.0's rust evaluator leaving a dead-ended sample's metadata for the next `init` (Quint #2012). The typescript backend and Quint 0.33.0 write `"init"` in both. Kept as the recording behind [0014](../../../docs/decisions/0014-quint-floor.md), and not regenerated |
 
 What these show, and what `quint verify` does with the same specs, is
 reproducible with [dev/probes/choreo_probe.sh](../../probes/choreo_probe.sh).

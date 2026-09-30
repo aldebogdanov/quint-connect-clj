@@ -1,7 +1,10 @@
 # Getting started
 
 From an empty directory to a model-based test that finds a real bug. Every
-command below was run against Quint 0.32.0 and Clojure 1.12.5.
+command below was run against Quint 0.32.0 and Clojure 1.12.5. Quint 0.33.0 is
+now the minimum ([why](decisions/0014-quint-floor.md)), and
+[`examples/counter/`](../examples/counter/) — §1–§5 as a project — runs green on
+it.
 
 §1–§5 exist as a project you can run instead of retype:
 [`examples/counter/`](../examples/counter/) is this same spec and the same

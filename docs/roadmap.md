@@ -380,14 +380,11 @@ against `in app … "Prepared"`, naming `#'tpc.core/handle-abort!`.
   0.32.0's default rust evaluator, writing more than one trace of Choreo's own
   spec, labels most initial states `"step"`, with the picks of an attempt that
   was never taken. Replay trusts the label, and the as-written route handles
-  `"step"`, so its adapter was handed the initial state before `init` ran. The
-  typescript backend and Quint 0.33.0 label it `"init"`; the instrumented route
-  is unaffected, because its action comes from the recording. Handled with the
-  `:backend` option that already exists for this evaluator's recorded quirks,
-  rather than by teaching `replay` to disbelieve the trace — that would be a
-  change to `replay` the plan did not include, and it is left as a question:
-  should a state 0 labelled with the step action go to `init` regardless?
-  Recorded as `tpc_mislabel_0/1.itf.json`, and in the probe.
+  `"step"`, so its adapter was handed the initial state before `init` ran.
+  First handled with `:backend :typescript`; then found in Quint's own
+  changelog as a bug fixed in 0.33.0 (#2012), which is now the floor —
+  [0014](decisions/0014-quint-floor.md). Replay still trusts the trace.
+  Recorded as `tpc_mislabel_0/1.itf.json`.
 - **No committed trace in the example.** The other four examples generate
   rather than replay, and the example says so; `replay-file` on Choreo traces
   is covered by the library's own tests.

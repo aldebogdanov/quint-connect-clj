@@ -38,6 +38,4 @@
                     (shell {:dir "dev/fixtures/choreo"}
                            "quint run two_phase_commit_tracked.qnt --mbt --seed=42 --max-steps=8 --n-traces=1 --max-samples=1 --out-itf=tpc_tracked_run_{seq}.itf.json --verbosity=0")
                     (shell {:dir "dev/fixtures/choreo"}
-                           "quint test two_phase_commit_tracked.qnt --match=^commitTest$ --out-itf=tpc_tracked_test_{test}.itf.json --verbosity=0")
-                    (shell {:dir "dev/fixtures/choreo"}
-                           "quint run two_phase_commit.qnt --mbt --seed=42 --max-steps=6 --n-traces=2 --max-samples=2 --out-itf=tpc_mislabel_{seq}.itf.json --verbosity=0"))}}}
+                           "quint test two_phase_commit_tracked.qnt --match=^commitTest$ --out-itf=tpc_tracked_test_{test}.itf.json --verbosity=0"))}}}
