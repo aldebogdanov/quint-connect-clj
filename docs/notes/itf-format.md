@@ -205,6 +205,69 @@ running Quint in the spec's own directory does have the effect the comment in
 assumption. If M7b runs
 `verify` from a scratch directory, this is the assumption it rests on.
 
+## Choreo, recorded 2026-09-30 on 0.32.0
+
+[Choreo](https://github.com/informalsystems/choreo)'s two-phase commit, vendored
+at commit `000cf4e` into [`dev/fixtures/choreo/`](../../dev/fixtures/choreo/),
+as written and instrumented. Everything below is reproducible with
+[`dev/probes/choreo_probe.sh`](../../dev/probes/choreo_probe.sh), and how the
+library uses it is [../choreo.md](../choreo.md).
+
+**One variable.** The whole state is `two_phase_commit::choreo::s`, a record of
+`events`, `extensions`, `messages` and `system`. The last three are
+`#map`s keyed by node id, so they decode with **string** keys. Local states are
+records; roles, stages and messages are sum types, and decode like any other
+variant: `{:tag "Working" :value []}` for one without an argument. `extensions`
+is `()` in Choreo's own spec — `{"#tup": []}`, which decodes to `[]`.
+
+**`--mbt` names nothing.** `mbt::actionTaken` is `"init"` at state 0 and
+`"step"` on every step after it, and `mbt::nondetPicks` is `{v, transition}`:
+the node that acted, and `{post_state, effects}`. Fixture: `tpc_run_0.itf.json`.
+
+**An instrumented spec names every step, in every trace.** When each
+transition records itself into `s.extensions.actionTaken` — the convention
+quint-connect (Rust) uses, and the one `two_phase_commit_tracked.qnt`
+follows — the name is state, so `quint test` writes it as well as
+`quint run`. `Init` carries the empty tuple. Fixtures:
+`tpc_tracked_run_0.itf.json`, `tpc_tracked_test_commitTest.itf.json`.
+
+**Instrumenting changes the traces.** `choreo::step` drops transitions with no
+effects and an unchanged post-state. Recording one gives every transition an
+effect, so a participant already `Aborted` can take `AbortsAsInstructed` again.
+In 150 traces of 20 steps, 74% of steps changed neither `system` nor
+`messages`. The recorded seed-42 run spends four of its eight steps that way.
+
+**State 0 can say `"step"`.** Quint 0.32.0's default rust evaluator, writing
+more than one trace of Choreo's own spec, labels state 0 of most of them
+`"step"`, with picks `{v: Some("p1"), transition: None}` — an attempt that was
+never taken. The state itself is the initial one. Twenty traces at seed 42: 19
+say `"step"`. `--backend=typescript`: all 20 say `"init"`. Quint 0.33.0 with
+its evaluator 0.7.0: `"init"` in both traces of the smallest reproduction.
+Every one of those runs ends with all four nodes decided, where no transition
+is enabled, and the instrumented spec — which always has one enabled — never
+shows it; that it is tied to runs ending that way is inference. Fixture:
+`tpc_mislabel_0.itf.json` (`"step"`) and `tpc_mislabel_1.itf.json` (`"init"`),
+the two traces of one run.
+
+**`quint verify` fails on every Choreo spec**, instrumented or not, with Quint
+0.32.0 / Apalache 0.56.1 and Quint 0.33.0 / Apalache 0.62.1:
+
+```
+error: <unknown>: internal error in type checking: A typed declaration
+two_phase_commit::choreo::s was transformed to an untyped expression
+two_phase_commit::choreo::s
+```
+
+It exits 1 and writes no trace. The message comes from Apalache —
+`TypeWatchdogTransformationListener`, in `apalache.jar` — and Choreo's
+Tendermint fails the same way. `quint compile --target=tlaplus` of the same
+spec succeeds. Whose bug it is was not established.
+
+**Imports resolve relative to the importing file.** `choreo.qnt` imports
+`"spells/basicSpells"` and finds it beside itself wherever it is vendored, and
+`quint typecheck` of a spec by absolute path from an unrelated directory
+succeeds — which is how `verify` runs.
+
 ## Large integers: a real trap
 
 With the **default `--backend=rust`**, integers with absolute value `>= 10^15`

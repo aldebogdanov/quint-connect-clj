@@ -334,6 +334,25 @@ Two things to know before you reach for it:
   run on every save — this repository uses `^:slow` and a `bb test:verify`
   task.
 
+## 9. A spec written with Choreo
+
+[Choreo](https://github.com/informalsystems/choreo) specs keep all of their
+state in one variable, `s`, and name none of their transitions: under `--mbt`
+every step is `"step"`. The spec records each transition in `s.extensions`, and
+the driver says where things are:
+
+```clojure
+(q/defdriver two-phase-commit
+  {:spec        "spec/two_phase_commit.qnt"
+   :scan        '[tpc.core tpc.model-test]
+   :state-path  [:s]                               ; compare s's fields
+   :action-path [:extensions :actionTaken :tag]    ; read inside s
+   :nondet-path [:extensions :actionTaken :value]})
+```
+
+The recipe, step by step, is [choreo.md](choreo.md), and
+[`examples/two-phase-commit/`](../examples/two-phase-commit/) runs it.
+
 ## The whole vocabulary
 
 Six keys, qualified by `quint`, requiring nothing. The first five are the ones
@@ -372,6 +391,8 @@ If `quint` collides with something, a driver can move all six at once with
                                               ; model checker for verify
    :action-path [:lastAction]                 ; for traces with no mbt:: — see §7
    :nondet-path [:lastPick]
+   :state-path  [:s]                          ; one record holding all the state,
+                                              ; as Choreo's does — see §9
    :key-fn  (fn [full-name] ...)})            ; variable name -> keyword
 ```
 

@@ -6,7 +6,69 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
-Nothing since 0.6.1.
+### Added
+
+- **Specs written with [Choreo](https://github.com/informalsystems/choreo).**
+  Choreo keeps all of a spec's state in one variable, `s`, and names none of
+  its transitions: under `--mbt` every step is `"step"`, and `quint test`
+  records no picks at all. The spec now records each transition in
+  `s.extensions` — the convention quint-connect (Rust) uses — and the driver
+  map says where things are:
+
+  ```clojure
+  {:state-path  [:s]
+   :action-path [:extensions :actionTaken :tag]
+   :nondet-path [:extensions :actionTaken :value]}
+  ```
+
+  That reaches `check`, `check-run` and `replay-file`, reports coverage per
+  transition, and lets the implementation's own functions be annotated with the
+  transitions they implement. The recipe is [docs/choreo.md](docs/choreo.md);
+  the reasoning is [0013](docs/decisions/0013-choreo-state-path.md).
+
+- **`:state-path`** in the driver map. The compared state becomes the record
+  found there, and its fields stand in for spec variables, so a reader is
+  annotated `{:quint/state :system}` as it would be for a spec with a variable
+  of that name. `:action-path` and `:nondet-path` are read inside it.
+  `:bad-decode-path` when it is not a vector, finds nothing — the message then
+  lists the variables there are — or finds something that is not a record.
+
+- **The empty tuple at `:nondet-path` is no picks.** A variant without an
+  argument, such as Choreo's `Init`, carries it as its value.
+
+- [examples/two-phase-commit/](examples/two-phase-commit/): Choreo's own
+  two-phase commit, instrumented, driving a Clojure implementation under
+  `check` and `check-run`, with a participant that ignores an abort and a
+  coordinator that forgets to broadcast as its broken versions. CI runs it.
+
+- Choreo vendored at a pinned commit, with its Apache-2.0 licence, in
+  `dev/fixtures/choreo/` and in the example; nothing of it reaches the jar.
+  See [0012](docs/decisions/0012-vendor-choreo.md). Four recordings of it, and
+  [`dev/probes/choreo_probe.sh`](dev/probes/choreo_probe.sh) to re-check what
+  they show.
+
+### Fixed
+
+- **Paths that leave nothing to compare are refused instead of passing.**
+  `:action-path [:s :extensions :actionTaken :tag]` reads the right action and
+  then removes `s` — all of a Choreo spec's state — as the path's root. Replayed
+  through driver-map handlers that did nothing at all, the recorded
+  `commitTest` trace passed all eight steps. With `:nondet-path` set as well it
+  failed, but only on `Init`'s empty tuple, which this release accepts. Both
+  are now `:bad-decode-path`, and the message names `:state-path`.
+
+### Recorded, not worked around
+
+- `quint verify` fails on every Choreo spec with Quint 0.32.0 and 0.33.0:
+  Apalache's type checker rejects it before any trace is written. `q/verify`
+  reports it as `:quint-failed` with the output verbatim.
+- Quint 0.32.0's default rust evaluator can label state 0 `"step"` when it
+  writes more than one trace of a Choreo spec as written, with the picks of an
+  attempt that was never taken. The typescript backend and Quint 0.33.0 do
+  not. It matters only to a driver that handles `"step"` itself, which is why
+  the example in [docs/choreo.md](docs/choreo.md) for that route sets
+  `:backend :typescript`. Details in
+  [notes/itf-format.md](docs/notes/itf-format.md) §Choreo.
 
 ## [0.6.1] — 2026-09-09
 

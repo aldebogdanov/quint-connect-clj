@@ -78,6 +78,7 @@ jobs:
       - run: cd examples/counter && clojure -M:test:local
       - run: cd examples/lru && clojure -M:test:local
       - run: cd examples/queue && clojure -M:test:local
+      - run: cd examples/two-phase-commit && clojure -M:test:local
       # tokens has ^:slow verify tests; -e :slow keeps Apalache out of CI.
       - run: cd examples/tokens && clojure -M:test:local -e :slow
 

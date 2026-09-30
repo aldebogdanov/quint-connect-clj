@@ -168,8 +168,9 @@
 
   Returns the map `replay/run-trace` consumes — `:actions`, `:readers`,
   `:init`, `:halt`, `:ignore`, `:compare` — with the remaining keys of the
-  driver map (`:spec`, `:main`, `:init-action`, `:step-action`, `:action-path`,
-  `:nondet-path`, `:key-fn`, …) passed through untouched for the caller.
+  driver map (`:spec`, `:main`, `:init-action`, `:step-action`, `:state-path`,
+  `:action-path`, `:nondet-path`, `:key-fn`, …) passed through untouched for
+  the caller.
 
   Throws `ex-info` with `:quint/error` `:empty-scan`, `:unnamed-driver`,
   `:duplicate-action`, `:duplicate-state`, `:duplicate-init`,

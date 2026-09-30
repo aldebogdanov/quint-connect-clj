@@ -74,7 +74,8 @@ and artifact (`org.clojars.aldebogdanov/quint-connect`).
 Nine namespaces, none of which application code ever loads. If one passes
 ~200 lines, that is a signal to stop and reconsider, not to split it reflexively.
 
-Two have passed it. `itf` stands at 241 and `quint` at 264.
+Three have passed it. `itf` stands at 339, `quint` at 299 and `replay` at
+233.
 
 `registry` reached 278 when `:bad-arglist` and `:bad-state-spec` were added,
 and was split rather than accepted, because this one had a seam worth an extra
@@ -87,6 +88,15 @@ still reads the way it did. The halves are 157 and 159 lines.
 not: Apalache's dialect decodes through it unchanged, and `#unserializable`
 never appeared, so the namespace is untouched since M7a. That condition held
 and is now discharged.
+
+It has grown twice since, and **is open for discussion at 339**. 0.6.1 took it
+to 289 with the shape checks on every tag, and M9 to 339 with `:state-path`,
+the empty tuple as no picks, and the check that the paths leave something to
+compare — most of it docstrings and error messages. The seam, if one is wanted,
+is already visible: decoding values (`#bigint`, `#map`, the bignumber form)
+and reading the decoded state through the driver's paths (`tracked` and the
+five functions it calls) share nothing but `fail`. Nothing has been split,
+because CLAUDE.md asks for that to be discussed first.
 
 `quint` grew with `verify!` and is **accepted at 264 for now**, deliberately.
 It is three commands against one CLI, sharing the version check, the scratch
@@ -285,6 +295,12 @@ touch application code.
    ;; each path starts at leaves the compared state.
    :action-path [:lastAction]
    :nondet-path [:lastPick]
+
+   ;; --- where the state lives ---------------------------------------------
+   ;; For a spec that keeps all of its state in one record, as Choreo keeps
+   ;; it in s: its fields are compared as if they were variables, and the two
+   ;; paths above are read inside it. See docs/choreo.md.
+   :state-path  [:s]
 
    :key-fn      (fn [full-name] ...)})      ; variable name -> keyword
 ```

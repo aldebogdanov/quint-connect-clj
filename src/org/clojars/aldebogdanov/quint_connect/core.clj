@@ -24,7 +24,7 @@
   "The driver keys the decoder understands. Everything else in the driver map
   is none of its business."
   [driver]
-  (select-keys driver [:key-fn :action-path :nondet-path]))
+  (select-keys driver [:key-fn :state-path :action-path :nondet-path]))
 
 (defn- opts!
   "Options are Quint's knobs and nothing else. `:actions` and `:state` shape the
