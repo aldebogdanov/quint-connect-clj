@@ -66,6 +66,16 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ### Fixed
 
+- **A diverging `check-run` is named after its run.** It was headed
+  `diverged on trace 0 of 1, seed ` — with nothing after "seed" — and saved as
+  `<spec>-seed-trace0.itf.json`, because both were written for random runs,
+  where the seed is what identifies a trace. A scripted run is identified by
+  its name and has a seed only if one was passed. Now: `diverged on run
+  "commitTest"`, saved as `<spec>-commitTest.itf.json`, and the result carries
+  `:test`. No seed is generated for it: `quint test` tries a randomized run
+  once when given a seed and up to 10000 times without one, so inventing one
+  would change what the run tests.
+
 - **`verify` under `:backend :tlc` no longer calls a violation a broken
   setup.** Quint writes `--out-itf` only from Apalache, so a TLC counterexample
   exits 1 with no trace — which `verify!` reported as "the invariant was never

@@ -282,6 +282,12 @@ The driver says where to read them, and `qt/check-run` names the run:
   (qt/check-run counter {:test "addThenTakeTest"}))
 ```
 
+A run is identified by its name, not a seed: a divergence reads `diverged on
+run "addThenTakeTest"` and is saved as `counter-addThenTakeTest.itf.json`, so
+running it again rewrites one file. Pass `:seed` only for a run with `nondet`
+in it — and note that Quint then tries it once, where without a seed it tries
+up to 10000 times.
+
 `lastAction` and `lastPick` are **not** compared against your application —
 each path's root variable leaves the state, because tracking the action is the
 spec's own bookkeeping and your code should know nothing about it. If you

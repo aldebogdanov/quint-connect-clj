@@ -86,7 +86,8 @@
 
   Takes a resolved driver and an options map merged over it; `:test` names a
   `run` in the spec and is required. Returns what `check` returns, with
-  `:traces` 1.
+  `:traces` 1 and `:test`, the run's name — which is what identifies the
+  trace, since a seed is only there if one was passed.
 
   `quint test` emits no `mbt::` variables, so the spec must record the action
   it took in an ordinary variable and the driver must say where with
@@ -97,7 +98,8 @@
   A scripted run is a scenario a human wrote down: use it for the case that
   must keep working, and `check` for the cases nobody thought of."
   [driver opts]
-  (replay-all driver (quint/test! (merge driver (opts! opts)))))
+  (let [o (merge driver (opts! opts))]
+    (assoc (replay-all driver (quint/test! o)) :test (:test o))))
 
 (defn verify
   "Check an invariant with Apalache, and replay the counterexample if there is
