@@ -324,7 +324,8 @@ counterexample to replay against the implementation. What TLC gives you is the
 answer about the spec.
 
 Action properties — Quint 0.33.0's temporal properties about transitions —
-are checked the same way, with `:temporal` in place of `:invariant`:
+are checked the same way, with `:temporal` in place of `:invariant`. Like
+everything under TLC, this checks the spec, not your code:
 
 ```quint
 temporal commitIsFinal = always(

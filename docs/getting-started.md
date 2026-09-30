@@ -343,7 +343,13 @@ Two things to know before you reach for it:
   run on every save — this repository uses `^:slow` and a `bb test:verify`
   task.
 
-### Temporal properties, and TLC
+### Temporal properties, and TLC — the spec only
+
+Everything else in this guide tests your code. This does not: under TLC no
+trace comes back, so a temporal property is checked against the spec and your
+implementation is never run. It is here so that the spec's own properties can
+sit in the same test suite; `quint verify` answers the same question without
+this library.
 
 `:temporal` names a `temporal` definition instead of an invariant — including
 Quint 0.33.0's action properties, which are about what a step may do rather
@@ -444,6 +450,15 @@ If `quint` collides with something, a driver can move all six at once with
 recorded failure a deterministic regression test — see §6.
 
 ## Rough edges, honestly
+
+- **Only one direction is checked.** Replay drives the application through
+  steps the spec *took*, and compares what it sees. It never asks the
+  application to take a step the spec *forbids*, so an application that allows
+  more than the spec does passes. Recorded on the two-phase commit: a
+  participant that aborts on its own after voting yes — a real safety bug —
+  passes `check` with 500 attempts on every seed tried, because no trace ever
+  asks a prepared participant to abort. Catching that needs a different kind of
+  test; see [roadmap](roadmap.md) §M8, "Refusal checks".
 
 - **0.6.1 is an early release.** The API is the one described here and is not
   expected to move, but nothing has been used in anger by anyone but its

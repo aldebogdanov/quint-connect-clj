@@ -435,12 +435,16 @@ file and line of the function that diverged and at the one that observed it.
 
 ## 7. Modes
 
-| mode         | trace source                          | when to use                                                   |
-| ------------ | ------------------------------------- | ------------------------------------------------------------- |
-| `check`      | `quint run --mbt` (N random traces)   | the default: broad conformance testing                        |
-| `check-run`  | `quint test --match ^name$`           | one scripted scenario from a Quint `run` (see caveat below)   |
-| `verify`     | `quint verify --invariant I` or `--temporal P` | prove the spec, then replay the counterexample if there is one |
-| `replay-file`| a committed `.itf.json`               | regression tests, CI without Quint                              |
+| mode         | trace source                          | what it tests | when to use                                                   |
+| ------------ | ------------------------------------- | ------------- | ------------------------------------------------------------- |
+| `check`      | `quint run --mbt` (N random traces)   | the code      | the default: broad conformance testing                        |
+| `check-run`  | `quint test --match ^name$`           | the code      | one scripted scenario from a Quint `run` (see caveat below)   |
+| `verify`     | `quint verify --invariant I`          | the spec, then the code against its counterexample (Apalache only) | prove the spec, then replay the counterexample if there is one |
+| `verify` `:temporal` | `quint verify --temporal P`, TLC | **the spec only** | a spec property in the same suite; no trace, nothing replayed |
+| `replay-file`| a committed `.itf.json`               | the code      | regression tests, CI without Quint                              |
+
+"The code" means one direction: along each trace, the implementation does what
+the spec did. None of these asks it to take a step the spec forbids — §11.
 
 Caveat, verified against Quint 0.32.0: **`quint test` does not accept `--mbt`**
 and its traces contain no `mbt::actionTaken`/`mbt::nondetPicks`. Same for
@@ -548,6 +552,7 @@ testing tool.
 | `^{...} (defn ...)` silently loses metadata                | `:empty-scan` error naming the trap; documented in three places                                            |
 | an annotation stranded under the wrong `:key-ns`           | **none** — caught only if the namespace scans empty; accepted in [0007](decisions/0007-annotation-keys.md) |
 | two scanned namespaces both annotating `:quint/init`       | `:duplicate-init` / `:duplicate-halt` at construction, naming both vars                                    |
+| the implementation allows a step the spec forbids          | **none** — traces only take steps the spec allows; a two-phase commit participant aborting after voting yes passes `check` (recorded). "Refusal checks" in [roadmap](roadmap.md) §M8 |
 | a spec variable no reader supplies                         | diverges against nothing on the first state carrying it; there is no `:missing-state` — see §5             |
 | `:quint/driver` naming a driver that does not exist        | **none** — indistinguishable from scoping to a driver not being built; accepted in [0009](decisions/0009-driver-scope.md) |
 | an `init` that does not fully reset leaks between traces   | state 0 is compared right after `init`; a leak fails immediately                                           |

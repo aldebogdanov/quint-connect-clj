@@ -25,6 +25,12 @@ spec.qnt  --quint run --mbt-->  ITF traces  --replay-->  your running app
                                             state diff on divergence
 ```
 
+What that checks is one direction: along every trace, the application does
+what the spec did. It never asks the application to take a step the spec does
+not allow, so an application that *also* does something forbidden — a
+participant that aborts after voting yes — passes. See
+[getting-started](docs/getting-started.md#rough-edges-honestly).
+
 The mapping between spec and code is declared with metadata, next to the code it
 describes. The application never learns that Quint exists: no context argument,
 no return-value convention, no require. This is the Clojure counterpart of
@@ -273,6 +279,7 @@ docs/choreo.md                 testing against a Choreo spec, step by step
 docs/roadmap.md
 docs/decisions/                ADRs — why the design is what it is
 docs/notes/                    observed behaviour of Quint and of var metadata
+docs/upstream/                 changes proposed to the tools this depends on
 CLAUDE.md                      working agreement for AI-assisted changes
 ```
 

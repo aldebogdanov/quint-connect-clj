@@ -130,7 +130,8 @@
   `:unknown-action`.
 
   `:temporal` names a `temporal` definition instead — an action property, say
-  — and needs `:backend :tlc`. One that holds returns `:ok? true` with
+  — and needs `:backend :tlc`. It checks the spec only: the implementation is
+  never run. One that holds returns `:ok? true` with
   `:temporal {:name \"commitIsFinal\" :holds? true}`. One that does not is the
   `:quint-failed` `quint/verify!` throws: TLC writes no counterexample, so
   there is nothing to replay and no result to build around it.

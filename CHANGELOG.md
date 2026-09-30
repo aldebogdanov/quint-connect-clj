@@ -31,7 +31,9 @@ follow [semantic versioning](https://semver.org/) from its first release.
   the reasoning is [0013](docs/decisions/0013-choreo-state-path.md).
 
 - **`:temporal` for `verify`**: check a `temporal` definition — Quint 0.33.0's
-  action properties included — where `:invariant` checks a `val`. It needs
+  action properties included — where `:invariant` checks a `val`. **It checks
+  the spec only**: no trace comes back from TLC, so the implementation is never
+  run. It needs
   `:backend :tlc` and is `:bad-options` without it: under Apalache Quint asks
   on stdin whether to go ahead, and unanswered it waits for ever, or, with
   stdin closed, exits 0 having checked nothing — recorded with

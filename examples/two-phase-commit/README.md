@@ -182,7 +182,8 @@ diverged at step 4, action "DecidesOnCommit"
   from TLC, so there is no counterexample to replay here. The `^:slow` test in
   [test/tpc/model_test.clj](test/tpc/model_test.clj) checks the invariant
   `consistency` and the action property `commitIsFinal` — a participant that
-  has committed stays committed — that way:
+  has committed stays committed — that way. It checks the spec, not the code
+  in `src/`:
 
   ```clojure
   (qt/verify two-phase-commit {:temporal "commitIsFinal" :backend :tlc})

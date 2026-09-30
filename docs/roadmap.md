@@ -241,6 +241,22 @@ turn comes; none is committed to now.
   information, and dropping steps from a state machine trace produces traces the
   spec never generated.
 - `witnesses` / `--invariants` support for targeted trace generation.
+- **Refusal checks: the other direction.** Replay checks that the
+  implementation does what the spec did. It never checks that the
+  implementation *refuses* what the spec does not allow, and a participant
+  that aborts after voting yes passes `check` (recorded 2026-09-30). One
+  shape a fix could take: the spec records, per state, which transitions are
+  enabled — as a Choreo spec already records the one it took — and at each
+  step the driver calls a transition the spec says is disabled, on a
+  throwaway copy of the state, and expects nothing to change. Costs: the spec
+  must record enabledness, and the application must be able to be copied or
+  reset to a state, which the annotation contract does not ask of it today.
+  The other shape is trace validation — record what the running system does
+  and ask whether the spec allows it — which checks real behaviour rather than
+  sampled behaviour, and needs a way to check a given trace against a spec
+  that Quint does not offer as a command. Noted, not committed to.
+- **TLC counterexamples.** Blocked on Quint writing them;
+  [upstream/quint-tlc-itf.md](upstream/quint-tlc-itf.md) is the proposal.
 
 - **Choreo support** left this list: it is M9, below.
 
