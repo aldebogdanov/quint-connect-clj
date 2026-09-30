@@ -6,7 +6,8 @@
 #   2. where an instrumented spec's transition lands, under `run` and `test`
 #   3. what the no-argument variant `Init` decodes from
 #   4. whether instrumentation changes which transitions a trace contains
-#   5. whether `quint verify` runs on a Choreo spec at all
+#   5. whether `quint verify` runs on a Choreo spec at all, why not, and
+#      what TLC does instead
 #   6. whether vendored imports resolve from somewhere other than the spec's own
 #      directory, which is where `verify` runs
 #   7. what state 0 says when Choreo as written runs to completion, per backend,
@@ -110,17 +111,48 @@ noops unfiltered.qnt
 echo '   -> without the filter most steps repeat an instruction already acted on;'
 echo '      with it, none do, and a trace ends when the protocol does'
 
-say '5. quint verify on a Choreo spec'
+say '5. quint verify on a Choreo spec, with Apalache and with TLC'
 mkdir -p scratch
-for spec in two_phase_commit.qnt two_phase_commit_tracked.qnt; do
-    (cd scratch && quint verify "$dir/$spec" --invariant=consistency \
-        --max-steps=3 --out-itf=v.itf.json --verbosity=0 > out.txt 2>&1)
-    printf '   %-30s exit %s | trace %-3s | %s\n' "$spec" "$?" \
+verify() {
+    rm -f scratch/v.itf.json
+    (cd scratch && quint verify "$dir/$1" --main="$2" --invariant="$3" "${@:4}" \
+        --out-itf="$dir/scratch/v.itf.json" --verbosity=0 > out.txt 2>&1)
+    printf '   %-30s %-12s %-15s exit %s | trace %-3s | %s\n' "$1" "$3" "${4:-apalache}" "$?" \
         "$([ -f scratch/v.itf.json ] && echo yes || echo no)" \
-        "$(grep -m1 . scratch/out.txt || echo '(silent)')"
-done
-echo '   -> fails, instrumented or not, and writes no trace. The message'
-echo '      is Apalache'"'"'s type watchdog, not Quint'"'"'s: it lives in apalache.jar'
+        "$(grep -m1 . scratch/out.txt | cut -c1-90 || echo '(silent)')"
+}
+verify two_phase_commit.qnt         two_phase_commit         consistency
+verify two_phase_commit_tracked.qnt two_phase_commit_tracked consistency
+verify two_phase_commit_tracked.qnt two_phase_commit_tracked consistency --backend=tlc
+verify two_phase_commit_tracked.qnt two_phase_commit_tracked wit_commit  --backend=tlc
+echo '   -> Apalache rejects both, each with an internal type-checking error'
+echo '      (the first is its type watchdog'"'"'s, in apalache.jar). TLC checks the'
+echo '      same spec: a holding invariant exits 0, a violated one exits 1 -- and'
+echo '      writes no trace, because Quint writes --out-itf only from Apalache.'
+
+# The smallest spec that reproduces it: a state variable whose type has a type
+# parameter, fixed only when the module is instantiated. Choreo's
+# `var s: GlobalContext[p, s, m, e, ext]` is that, so every Choreo spec is.
+cat > poly.qnt <<'QNT'
+module lib {
+  const procs: Set[p]
+  var s: p -> int
+  action init = s' = procs.mapBy(x => 0)
+  action step = { nondet v = oneOf(procs)
+                  s' = s.set(v, 1) }
+}
+module main {
+  import lib(procs = Set("a", "b")) as lib from "./poly"
+  action init = lib::init
+  action step = lib::step
+  val inv = true
+}
+QNT
+sed -e 's/Set\[p\]/Set[str]/' -e 's/var s: p -> int/var s: str -> int/' \
+    -e 's#"./poly"#"./mono"#' poly.qnt > mono.qnt
+verify poly.qnt main inv
+verify mono.qnt main inv
+echo '   -> the same module with its type written out passes'
 
 say '6. do the imports resolve from another directory?'
 mkdir -p elsewhere

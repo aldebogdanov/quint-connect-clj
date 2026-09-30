@@ -66,6 +66,14 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ### Fixed
 
+- **`verify` under `:backend :tlc` no longer calls a violation a broken
+  setup.** Quint writes `--out-itf` only from Apalache, so a TLC counterexample
+  exits 1 with no trace — which `verify!` reported as "the invariant was never
+  checked; the spec or the invariant name is the likely cause". It is still
+  `:quint-failed`, since there is nothing to replay, but the message now says
+  what that outcome means under TLC and quotes Quint's first line, which is
+  where the verdict is.
+
 - **Paths that leave nothing to compare are refused instead of passing.**
   `:action-path [:s :extensions :actionTaken :tag]` reads the right action and
   then removes `s` — all of a Choreo spec's state — as the path's root. Replayed
@@ -76,9 +84,12 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ### Recorded, not worked around
 
-- `quint verify` fails on every Choreo spec with Quint 0.32.0 and 0.33.0:
-  Apalache's type checker rejects it before any trace is written. `q/verify`
-  reports it as `:quint-failed` with the output verbatim.
+- `quint verify` through Apalache fails on every Choreo spec: a state
+  variable whose type has a type parameter fixed only by instantiating the
+  module — Choreo's `s` — is rejected by Apalache's type checker, from Quint
+  0.28.0 to 0.33.0. Reduced to thirteen lines in
+  [notes/itf-format.md](docs/notes/itf-format.md) §Choreo. `{:backend :tlc}`
+  checks Choreo specs instead, and writes no trace to replay.
 
 ## [0.6.1] — 2026-09-09
 

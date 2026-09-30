@@ -112,10 +112,11 @@ can only say `"step"`.
   is part of the recipe, not an option: without it no trace ends before
   `max-steps`, and `:max-samples`, which picks the longest traces, has nothing
   to choose between.
-- `quint verify` cannot be demonstrated on a Choreo spec: under Quint 0.32.0
-  and 0.33.0, Apalache's type checker rejects every Choreo spec and no trace is
-  written. The instrumented route asks nothing of a counterexample
-  that a `quint test` trace does not already satisfy, but that is inference
-  until Quint writes one.
+- `verify` cannot replay a Choreo counterexample. Apalache rejects every
+  Choreo spec — a state variable whose type stays generic until instantiation,
+  reduced in [notes/itf-format.md](../notes/itf-format.md) §Choreo — and TLC,
+  which checks them, writes no trace. The instrumented route asks nothing of a
+  counterexample that a `quint test` trace does not already satisfy, but that
+  is inference until one exists.
 - `itf` grows, and was already past the ~200 lines CLAUDE.md treats as a
   signal. [architecture.md](../architecture.md) §3 says where it stands.

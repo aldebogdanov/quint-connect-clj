@@ -145,5 +145,23 @@
 (deftest ^:integration a-scripted-choreo-run-checks
   (qt/check-run tracked {:test "commitTest"}))
 
+;; --- verify, which only TLC can do on a Choreo spec -----------------------
+;; Apalache's type checker rejects every Choreo spec (notes/itf-format.md
+;; §Choreo). TLC checks them, and writes no trace for Quint to hand back.
+
+(deftest ^:slow a-choreo-invariant-that-holds-passes-under-tlc
+  (let [r (q/verify tracked {:invariant "consistency" :backend :tlc})]
+    (is (:ok? r))
+    (is (true? (get-in r [:invariant :holds?])))))
+
+(deftest ^:slow a-violated-choreo-invariant-under-tlc-says-what-happened
+  ;; wit_commit is a witness: violating it means a commit is reachable.
+  (let [e (try (q/verify tracked {:invariant "wit_commit" :backend :tlc})
+               (catch clojure.lang.ExceptionInfo e e))]
+    (is (= :quint-failed (:quint/error (ex-data e))))
+    (is (str/includes? (ex-message e) "Under TLC a violated invariant looks the same"))
+    (is (str/includes? (ex-message e) "found a counterexample")
+        "the verdict is Quint's, quoted")))
+
 (deftest ^:integration choreo-as-written-checks-through-one-adapter
   (qt/check as-written {:traces 20 :max-steps 12 :seed 42}))

@@ -302,11 +302,26 @@ What it costs:
 
 ## What does not work
 
-**`verify`.** With Quint 0.32.0 and 0.33.0, `quint verify` fails on every
-Choreo spec — instrumented or not, the two-phase commit and Choreo's Tendermint
-alike — with Apalache reporting an internal type-checking error. `q/verify`
-reports it as `:quint-failed` with that output verbatim. There is no
-counterexample to replay until that is fixed upstream.
+**`verify` through Apalache, the default.** It rejects every Choreo spec —
+instrumented or not, the two-phase commit and Choreo's Tendermint alike — with
+an internal type-checking error, and `q/verify` reports that as `:quint-failed`
+with the output verbatim. The cause, reduced to thirteen lines: a state
+variable whose type has a type parameter fixed only by instantiating the
+module, which is what Choreo's `s` is. Present from Quint 0.28.0 to 0.33.0;
+[notes/itf-format.md](notes/itf-format.md) §Choreo has the reduction.
+
+**`verify` through TLC works, and has nothing to replay.**
+
+```clojure
+(q/verify two-phase-commit {:invariant "consistency" :backend :tlc})
+;; => {:ok? true :invariant {:name "consistency" :holds? true} ...}
+```
+
+A violated invariant is `:quint-failed`, with a message saying that under TLC
+this is what a violation looks like and quoting Quint's `found a
+counterexample`. Quint writes a trace only from Apalache, so there is no
+counterexample to replay against the implementation. What TLC gives you is the
+answer about the spec.
 
 ## Reference
 

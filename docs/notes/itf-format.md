@@ -285,8 +285,44 @@ two_phase_commit::choreo::s
 
 It exits 1 and writes no trace. The message comes from Apalache —
 `TypeWatchdogTransformationListener`, in `apalache.jar` — and Choreo's
-Tendermint fails the same way. `quint compile --target=tlaplus` of the same
-spec succeeds. Whose bug it is was not established.
+Tendermint fails the same way. The instrumented spec, since its `step` gained a
+filter, fails with a different one: `internal error: while type checking in
+Apalache`.
+
+**What triggers it, reduced.** A state variable whose type has a type
+parameter, fixed only when the module is instantiated. Thirteen lines do it:
+
+```
+module lib {
+  const procs: Set[p]
+  var s: p -> int
+  action init = s' = procs.mapBy(x => 0)
+  action step = { nondet v = oneOf(procs)
+                  s' = s.set(v, 1) }
+}
+module main {
+  import lib(procs = Set("a", "b")) as lib from "./poly"
+  ...
+}
+```
+
+fails `quint verify` with an Apalache type error, and the same module with
+`Set[str]` and `str -> int` written out passes. Choreo's
+`var s: GlobalContext[p, s, m, e, ext]` is exactly that shape, so every Choreo
+spec is exposed. The same reduction fails on Quint 0.28.0, 0.30.0, 0.31.0,
+0.32.0 and 0.33.0: long-standing, not a regression. Nothing in Quint's CHANGELOG or commit
+history names it; its issue tracker could not be searched from where this was
+recorded. Two things ruled out on the way: renaming Choreo's type parameter `s`,
+which shares its name with the variable, and removing the never-assigned
+`var display: d`.
+
+**TLC checks Choreo specs.** `quint verify --backend=tlc` on the instrumented
+two-phase commit exits 0 for `consistency`, which holds, and 1 with `error:
+found a counterexample` for the witness `wit_commit`. It writes no trace
+either way: Quint writes `--out-itf` only on the Apalache path
+(`processApalacheResult` in `cliReporting.ts`; the TLC path in `tlc.ts` reads
+TLC's exit code). So a violated invariant under TLC is a verdict with nothing
+to replay.
 
 **Imports resolve relative to the importing file.** `choreo.qnt` imports
 `"spells/basicSpells"` and finds it beside itself wherever it is vendored, and

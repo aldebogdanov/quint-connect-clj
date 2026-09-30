@@ -303,10 +303,15 @@
   with the scratch directory. Apalache is downloaded on first use and a run can
   take minutes.
 
+  With `:backend :tlc`, a violated invariant writes no trace either: Quint
+  writes `--out-itf` only from Apalache. So under TLC that outcome is also
+  `:quint-failed`, with a message that says so and quotes Quint's first line —
+  there is no counterexample to replay, and the verdict is in that line.
+
   Throws `ex-info` with `:quint/error` `:quint-not-found`, or `:quint-failed`
   when quint exited non-zero without writing a counterexample — carrying
   Quint's own stderr, which is where the reason is."
-  [{:keys [spec invariant] :as opts}]
+  [{:keys [spec invariant backend] :as opts}]
   (when-not spec
     (fail :quint-failed "no :spec in the driver" {:opts opts}))
   (when-not invariant
@@ -319,9 +324,17 @@
       (zero? exit) {:holds? true  :cmd cmd :dir dir :traces []}
       (seq traces) {:holds? false :cmd cmd :dir dir :traces traces}
       :else        (fail :quint-failed
-                         (str "quint verify exited " exit " and wrote no"
-                              " counterexample, so the invariant was never"
-                              " checked; the spec or the invariant name is the"
-                              " likely cause")
+                         (if (= "tlc" (some-> backend name))
+                           (str "quint verify --backend=tlc exited " exit
+                                " and wrote no trace. Under TLC a violated"
+                                " invariant looks the same, because Quint writes"
+                                " --out-itf only from Apalache: there is nothing"
+                                " to replay. Quint said: "
+                                (some #(when-not (str/blank? %) (str/trim %))
+                                      (str/split-lines (str out err))))
+                           (str "quint verify exited " exit " and wrote no"
+                                " counterexample, so the invariant was never"
+                                " checked; the spec or the invariant name is the"
+                                " likely cause"))
                          {:cmd cmd :dir dir :invariant invariant :exit exit
                           :stderr err :stdout out}))))

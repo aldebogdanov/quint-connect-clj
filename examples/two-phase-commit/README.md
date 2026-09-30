@@ -174,9 +174,12 @@ diverged at step 4, action "DecidesOnCommit"
 - **A broadcast reaches the sender too.** Choreo's `Broadcast` delivers to
   every node, the one sending included, so the coordinator's own inbox holds
   its `CoordinatorAbort`. The network in `tpc.core` does the same.
-- **`verify` does not run on a Choreo spec** with Quint 0.32.0 or 0.33.0:
-  Apalache rejects every one, this one and Choreo's Tendermint alike, with an
-  internal type-checking error. `check` and `check-run` are what there is.
+- **`verify` runs through TLC only, and replays nothing.** Apalache rejects
+  every Choreo spec with an internal type-checking error — the cause is a
+  state variable whose type is left generic until the module is instantiated,
+  which is what Choreo's `s` is. `{:backend :tlc}` checks the spec: an
+  invariant that holds passes, and one that does not says so, but Quint writes
+  no trace from TLC, so there is no counterexample to replay here.
 
 ## What to look at
 

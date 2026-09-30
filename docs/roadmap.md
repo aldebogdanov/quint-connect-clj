@@ -308,6 +308,9 @@ at all, and coverage can only ever say `"step"`.
   Choreo counterexample to record. `q/verify` surfaces the failure as
   `:quint-failed` with that stderr verbatim, which is the right behaviour and
   all this library can do. Reproducible with [`dev/probes/choreo_probe.sh`](../dev/probes/choreo_probe.sh).
+  *After review:* reduced to thirteen lines — a state variable whose type has
+  a type parameter fixed only by instantiation — present from Quint 0.28.0 on;
+  and `--backend=tlc` checks Choreo specs, without writing a trace.
 - Imports resolve relative to the importing file, so vendored Choreo works
   from any directory layout that keeps `choreo.qnt` beside its `spells/`.
 
