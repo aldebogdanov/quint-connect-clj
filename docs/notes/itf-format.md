@@ -324,6 +324,13 @@ either way: Quint writes `--out-itf` only on the Apalache path
 TLC's exit code). So a violated invariant under TLC is a verdict with nothing
 to replay.
 
+Quint 0.33.0's action properties — temporal properties about transitions,
+checked only with TLC — work on the same spec: `always(... implies
+next(stage) == Committed).orKeep(choreo::s)`, "a committed participant stays
+committed", holds with `--temporal`, and one saying the coordinator's stage
+never changes is violated with `error: found a counterexample`. No trace for
+either. This library's `verify` passes `--invariant` only.
+
 **Imports resolve relative to the importing file.** `choreo.qnt` imports
 `"spells/basicSpells"` and finds it beside itself wherever it is vendored, and
 `quint typecheck` of a spec by absolute path from an unrelated directory
