@@ -294,9 +294,9 @@ at all, and coverage can only ever say `"step"`.
   which decodes to `[]` — not a record of picks.
 - Recording an action as an effect means no transition is ever empty, so
   Choreo's filter stops dropping no-op transitions. A recorded seed-42 trace
-  spends four of its eight steps on `AbortsAsInstructed` for participants that
-  had already aborted. The implementation must treat a repeated instruction as
-  the no-op it is — which one receiving a duplicate message must do anyway.
+  spent four of its eight steps on `AbortsAsInstructed` for participants that
+  had already aborted. (Fixed after review: the spec now filters them itself —
+  see below.)
 - **`quint verify` fails on every Choreo spec**, instrumented or not, on Quint
   0.32.0 and on 0.33.0 (released 2026-09-28): `internal error in type
   checking: A typed declaration two_phase_commit::choreo::s was transformed to
@@ -385,6 +385,13 @@ against `in app … "Prepared"`, naming `#'tpc.core/handle-abort!`.
   changelog as a bug fixed in 0.33.0 (#2012), which is now the floor —
   [0014](decisions/0014-quint-floor.md). Replay still trusts the trace.
   Recorded as `tpc_mislabel_0/1.itf.json`.
+- **Found after review: the repeats were the spec's to remove.** They were
+  first documented as something the implementation must tolerate. They are a
+  change to the protocol's traces that Choreo itself prevents, and a one-line
+  filter in the instrumented spec, `changes_something`, prevents them again.
+  With it, a run ends when the protocol does, which is also what makes
+  `:max-samples` useful: Quint writes the longest of its attempts, and 500
+  attempts for 50 traces put ten commits among them instead of one.
 - **No committed trace in the example.** The other four examples generate
   rather than replay, and the example says so; `replay-file` on Choreo traces
   is covered by the library's own tests.

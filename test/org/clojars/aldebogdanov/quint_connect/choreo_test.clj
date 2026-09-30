@@ -58,9 +58,9 @@
 (deftest a-recorded-transition-is-dispatched-by-name
   (let [r (q/replay-file tracked "dev/fixtures/choreo/tpc_tracked_run_0.itf.json")]
     (is (:ok? r) (report/failure-str r))
-    (is (= 9 (:steps r)))
+    (is (= 5 (:steps r)) "the trace ends when every node has decided")
     (testing "coverage is per transition, not \"step\""
-      (is (= {"DecidesOnAbort" 1 "SpontaneouslyAborts" 2 "AbortsAsInstructed" 5}
+      (is (= {"DecidesOnAbort" 1 "SpontaneouslyAborts" 2 "AbortsAsInstructed" 1}
              (get-in r [:coverage :used])))
       (is (= #{"SpontaneouslyPrepares" "CommitsAsInstructed" "DecidesOnCommit"}
              (get-in r [:coverage :unused]))))))

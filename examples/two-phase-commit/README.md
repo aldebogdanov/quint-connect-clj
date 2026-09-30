@@ -97,11 +97,25 @@ to `{:tag "Working" :value []}`, and they build exactly that:
 
 Coverage is reported per transition, because the spec names them. It says
 something worth knowing: a commit needs every participant to vote yes before
-the coordinator gives up, and random traces rarely manage that. Ten seeds of
-50 traces each reached `DecidesOnCommit` in four, once or twice each time.
+the coordinator gives up, and a random run manages that about once in fifty.
 
-So the commit path is written down in the spec as the run `commitTest`, and
-replayed with `check-run`:
+More steps would not help — a run ends when every node has decided, never
+later than step 7. More *attempts* do. `:max-samples` is how many runs Quint
+tries and `:traces` how many it writes, and it writes the longest. A commit is
+the longest run this protocol has, so
+
+```clojure
+(qt/check two-phase-commit {:traces 50 :max-samples 500 :max-steps 20})
+```
+
+puts ten or eleven commits among the fifty traces, where leaving `:max-samples`
+at 50 puts one. Measured over thirteen seeds, and every transition was
+exercised in each; the test asserts that nothing in the coverage report is
+left unused. Push it too far and the short runs are crowded out: at 2000
+attempts, no written trace had a participant abort on its own.
+
+And the one path that must always be tested is written down in the spec, as
+the run `commitTest`, and replayed with `check-run`:
 
 ```clojure
 (deftest the-commit-scenario-conforms-to-spec
@@ -150,14 +164,13 @@ diverged at step 4, action "DecidesOnCommit"
 
 ## Things that will surprise you
 
-- **Most steps are repeats.** Recording a transition gives every transition an
-  effect, and Choreo only drops transitions that change nothing. So a
-  participant that has aborted can be told to abort again, and again: in the
-  runs above, about three steps in four were `AbortsAsInstructed`. The
-  implementation must treat a repeated instruction as the no-op it is — which
-  one that receives a duplicate message must do anyway. If they get in the
-  way, tighten the guard in the spec; this example leaves Choreo's guards
-  alone.
+- **Recording a transition needs one more line to stay Choreo.** Choreo never
+  removes a message, so an instruction stays in a participant's inbox after it
+  has acted on it, and `choreo::step` drops the repeat only because it changes
+  nothing. The record is an effect, so it would change something, and every
+  repeat would be kept: without `changes_something` in the spec, three steps in
+  four did nothing but repeat an instruction already acted on, and no run
+  ended before `max-steps`. The filter counts the record out, and puts Choreo's rule back.
 - **A broadcast reaches the sender too.** Choreo's `Broadcast` delivers to
   every node, the one sending included, so the coordinator's own inbox holds
   its `CoordinatorAbort`. The network in `tpc.core` does the same.

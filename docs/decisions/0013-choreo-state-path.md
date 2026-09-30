@@ -105,9 +105,13 @@ can only say `"step"`.
 ## Consequences
 
 - An instrumented spec is a changed spec: every transition now has an effect,
-  so Choreo's filter no longer drops no-op transitions. Traces include
-  instructions delivered to a node that has already acted on them. The
-  implementation must treat those as the no-ops they are.
+  so Choreo's filter no longer drops no-op transitions, and a node is told
+  again and again to do what it already did — three steps in four, in the
+  two-phase commit. The spec puts the rule back with one more filter,
+  `changes_something`, which is Choreo's test with the record counted out. It
+  is part of the recipe, not an option: without it no trace ends before
+  `max-steps`, and `:max-samples`, which picks the longest traces, has nothing
+  to choose between.
 - `quint verify` cannot be demonstrated on a Choreo spec: under Quint 0.32.0
   and 0.33.0, Apalache's type checker rejects every Choreo spec and no trace is
   written. The instrumented route asks nothing of a counterexample

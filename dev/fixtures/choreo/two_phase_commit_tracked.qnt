@@ -1,6 +1,7 @@
 // Derived from informalsystems/choreo at 000cf4e, examples/two_phase_commit/,
 // Apache-2.0; see LICENSE beside this file. Changed: every transition records
-// which one it was, and the import paths point beside this file. The protocol
+// which one it was, step and step_with keep Choreo's filter of transitions that
+// change nothing, and the import paths point beside this file. The protocol
 // logic -- every guard, post-state and message -- is Choreo's, unchanged.
 //
 // Why: Choreo never names a transition, so a trace carries only its outcome,
@@ -65,6 +66,14 @@ module two_phase_commit_tracked {
       | RecordAction(a) => { ...ctx, extensions: { ...ctx.extensions, actionTaken: a } }
     }
   }
+
+  // choreo::step drops a transition that changes nothing: no effects and the
+  // same local state. The record is an effect, so without this every
+  // transition would pass that test, and a node would be told again and again
+  // to do what it already did. Each transition carries exactly one record, so
+  // this is Choreo's own test with the record counted out.
+  pure def changes_something(ctx: LocalContext, t: Transition): bool =
+    t.effects.size() > 1 or t.post_state != ctx.state
   // ---------------------------------------------------------------------------
 
   pure def get_prepared_msgs(msgs: Set[Message]): Set[Node] = {
@@ -180,7 +189,7 @@ module two_phase_commit_tracked {
   })
 
   action step = choreo::step(
-    main_listener,
+    ctx => main_listener(ctx).filter(t => changes_something(ctx, t)),
     apply_custom_effects
   )
 
@@ -196,7 +205,8 @@ module two_phase_commit_tracked {
   val wit_commit = PARTICIPANTS.exists(p => choreo::s.system.get(p).stage != Committed)
 
   action step_with(v: Node, listener: LocalContext => Set[Transition]): bool =
-    choreo::step_with(v, listener, apply_custom_effects)
+    choreo::step_with(v, ctx => listener(ctx).filter(t => changes_something(ctx, t)),
+                      apply_custom_effects)
 
   run commitTest = init
     .then(step_with("p1", spontaneously_prepares))

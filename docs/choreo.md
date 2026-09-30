@@ -35,7 +35,7 @@ specs. The reasoning is in
 
 ## Step 1 — Record each transition in the spec
 
-Four additions, none of which touch the protocol's logic. In Quint:
+Five additions, none of which touch the protocol's logic. In Quint:
 
 ```quint
 // (a) Name every transition, with the picks the implementation needs as a
@@ -68,15 +68,32 @@ pure def apply_custom_effects(ctx: GlobalContext, effect: CustomEffects): Global
   post_state: { ...ctx.state, stage: Committed }
 }
 
-// (d) The initial value, and the processor handed to Choreo.
+// (d) Keep Choreo's rule that a transition which changes nothing is dropped.
+//     choreo::step drops one with no effects and the same local state; the
+//     record is an effect, so without this nothing would ever be dropped.
+pure def changes_something(ctx: LocalContext, t: Transition): bool =
+  t.effects.size() > 1 or t.post_state != ctx.state
+
+// (e) The initial value, and what is handed to Choreo.
 action init = choreo::init({ ..., extensions: { actionTaken: Init } })
-action step = choreo::step(main_listener, apply_custom_effects)
+action step = choreo::step(
+  ctx => main_listener(ctx).filter(t => changes_something(ctx, t)),
+  apply_custom_effects
+)
 ```
 
 If the spec already has extensions, add an `actionTaken` field to its record
 rather than replacing it. If it already has custom effects, add `RecordAction`
-as one more variant and one more `match` arm. Hand `apply_custom_effects` to
-every `choreo::step…` call, `step_with` in `run`s included.
+as one more variant and one more `match` arm. Hand `apply_custom_effects`, and
+the filter, to every `choreo::step…` call, `step_with` in `run`s included.
+
+Why (d) matters: Choreo never removes a message, so an instruction stays in a
+node's inbox after it has acted on it, and the transition that reacts to it
+stays enabled. Choreo drops it because it changes nothing. Without (d) it is
+taken again and again: in the two-phase commit, three steps in four did nothing
+but repeat an instruction, and no trace ever ended before `max-steps`. Every
+Choreo spec that reacts to messages is exposed the same way, and quint-connect
+(Rust)'s own instrumented two-phase commit has no such filter.
 
 A variant's value must be a **record**, even for one pick: write
 `Prepares({ node: Node })`, not `Prepares(Node)`. A variant with no argument,
@@ -210,8 +227,22 @@ transition is recorded in `s`, and `s` is in every trace.
 Read the coverage in the result: `(get-in r [:coverage :unused])` lists
 transitions no trace exercised. Protocols often have a path random traces
 rarely reach — in the two-phase commit, a commit needs every participant to
-vote yes before the coordinator gives up — and a `run` in the spec is how to
-make sure it is tested.
+vote yes before the coordinator gives up, about one run in fifty.
+
+More `:max-steps` does not help: with (d) in place a trace ends when the
+protocol does. What helps is **`:max-samples`**. It is the number of attempts,
+`:traces` the number written, and Quint writes the longest of its attempts. A
+protocol's deepest path is usually its longest, so
+
+```clojure
+(qt/check two-phase-commit {:traces 50 :max-samples 500 :max-steps 20})
+```
+
+puts about ten commits among the fifty traces, against one with `:max-samples`
+left at `:traces`. It is a bias, and it can crowd out the short paths: at 2000
+attempts no written trace had a participant abort on its own. Coverage says
+when that happens. A `run` in the spec is the way to make sure one particular
+path is always tested.
 
 ## When it fails
 
@@ -228,13 +259,9 @@ make sure it is tested.
 
 Two things are not errors, and will still surprise you:
 
-- **Repeated instructions.** Recording gives every transition an effect, and
-  Choreo drops only transitions that change nothing, so an instruction can be
-  delivered again to a node that has already acted on it. In the two-phase
-  commit, about three steps in four change nothing at all: a participant told
-  again to do what it already did. The implementation must treat it as the
-  no-op it is. If the repeats get in the way, tighten the transition's guard in
-  the spec.
+- **Most steps repeat an instruction**, and no trace ends before `max-steps`:
+  step 1 (d) is missing, so Choreo's rule of dropping transitions that change
+  nothing no longer applies.
 - **`display`**, if the spec uses `step_with_displayer`, is outside `s` and is
   not compared.
 

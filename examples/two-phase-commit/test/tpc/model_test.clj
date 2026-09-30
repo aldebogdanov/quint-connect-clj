@@ -61,11 +61,13 @@
    :ignore      #{:events}})
 
 (deftest two-phase-commit-conforms-to-spec
-  (let [r (qt/check two-phase-commit {:traces 50 :max-steps 20})]
-    ;; Random traces rarely reach a commit: every participant has to vote yes
-    ;; before the coordinator gives up. Coverage says which transitions a run
-    ;; exercised, per transition, because the spec names them.
-    (is (contains? (get-in r [:coverage :used]) "DecidesOnAbort"))))
+  ;; A random run rarely commits: every participant has to vote yes before the
+  ;; coordinator gives up, about one run in fifty. Quint writes the longest of
+  ;; its :max-samples attempts, and a commit is the longest run there is, so
+  ;; 500 attempts for 50 traces put about ten commits among them.
+  (let [r (qt/check two-phase-commit {:traces 50 :max-samples 500 :max-steps 20})]
+    ;; Coverage is per transition, because the spec names them.
+    (is (empty? (get-in r [:coverage :unused])))))
 
 (deftest the-commit-scenario-conforms-to-spec
   ;; So the path random traces rarely take is written down in the spec, as

@@ -236,11 +236,26 @@ follows — the name is state, so `quint test` writes it as well as
 `quint run`. `Init` carries the empty tuple. Fixtures:
 `tpc_tracked_run_0.itf.json`, `tpc_tracked_test_commitTest.itf.json`.
 
-**Instrumenting changes the traces.** `choreo::step` drops transitions with no
-effects and an unchanged post-state. Recording one gives every transition an
-effect, so a participant already `Aborted` can take `AbortsAsInstructed` again.
-In 150 traces of 20 steps, 74% of steps changed neither `system` nor
-`messages`. The recorded seed-42 run spends four of its eight steps that way.
+**Instrumenting changes the traces, unless the spec undoes it.**
+`choreo::step` drops transitions with no effects and an unchanged post-state.
+Recording one gives every transition an effect, so a participant already
+`Aborted` can take `AbortsAsInstructed` again — its `CoordinatorAbort` is never
+removed from its inbox. Without a filter: 74% of the steps in 150 traces of 20
+steps changed neither `system` nor `messages`, and every trace ran to
+`max-steps`. With `changes_something` — Choreo's test with the one record
+counted out, which `two_phase_commit_tracked.qnt` applies in `step` and
+`step_with`: none, and no trace longer than 7 steps. The recorded seed-42 run
+is the unfiltered one with its four repeats taken out, ending at step 4, where
+every node has decided.
+
+**Quint writes the longest traces it tried.** `--max-samples` attempts,
+`--n-traces` written, chosen by the rust evaluator's `compare_by_quality`:
+violations first, then the longest (`evaluator/src/trace_quality.rs`, 0.33.0).
+With repeats filtered out, the longest two-phase commit runs are the commits.
+50 traces from 50 attempts carried one `DecidesOnCommit`, on each of three
+seeds; from 500 attempts, ten or eleven, on each of thirteen, with every
+transition still exercised; from 2000, eleven or twelve, and no
+`SpontaneouslyAborts` at all.
 
 **On 0.32.0, state 0 could say `"step"`.** Quint 0.32.0's default rust
 evaluator, writing more than one trace of Choreo's own spec, labels state 0 of

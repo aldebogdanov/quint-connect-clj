@@ -2,9 +2,10 @@
 // which one it was. Derived from informalsystems/choreo at 000cf4e,
 // examples/two_phase_commit/, Apache-2.0: see choreo/LICENSE. Changed: the
 // definitions between the "instrumentation" markers, one record(...) effect on
-// each transition, the initial extensions, the effect processor handed to
-// choreo::step and choreo::step_with, and the import paths. Every guard,
-// post-state and message is Choreo's.
+// each transition, the initial extensions, what step and step_with hand to
+// choreo::step and choreo::step_with -- the effect processor, and the filter
+// that keeps Choreo's rule of dropping transitions that change nothing -- and
+// the import paths. Every guard, post-state and message is Choreo's.
 //
 // Choreo never names a transition -- a trace carries only its outcome -- so an
 // implementation cannot be driven by name without this. Each transition emits
@@ -66,6 +67,14 @@ module two_phase_commit {
       | RecordAction(a) => { ...ctx, extensions: { ...ctx.extensions, actionTaken: a } }
     }
   }
+
+  // choreo::step drops a transition that changes nothing: no effects and the
+  // same local state. The record is an effect, so without this every
+  // transition would pass that test, and a node would be told again and again
+  // to do what it already did. Each transition carries exactly one record, so
+  // this is Choreo's own test with the record counted out.
+  pure def changes_something(ctx: LocalContext, t: Transition): bool =
+    t.effects.size() > 1 or t.post_state != ctx.state
   // --- end of instrumentation ------------------------------------------------
 
   pure def get_prepared_msgs(msgs: Set[Message]): Set[Node] = {
@@ -181,7 +190,7 @@ module two_phase_commit {
   })
 
   action step = choreo::step(
-    main_listener,
+    ctx => main_listener(ctx).filter(t => changes_something(ctx, t)),
     apply_custom_effects
   )
 
@@ -197,7 +206,8 @@ module two_phase_commit {
   val wit_commit = PARTICIPANTS.exists(p => choreo::s.system.get(p).stage != Committed)
 
   action step_with(v: Node, listener: LocalContext => Set[Transition]): bool =
-    choreo::step_with(v, listener, apply_custom_effects)
+    choreo::step_with(v, ctx => listener(ctx).filter(t => changes_something(ctx, t)),
+                      apply_custom_effects)
 
   run commitTest = init
     .then(step_with("p1", spontaneously_prepares))

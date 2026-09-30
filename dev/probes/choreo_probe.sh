@@ -81,30 +81,34 @@ PY
 echo '   -> the empty tuple, which decodes to [] and is not a record of picks'
 
 say '4. does recording change which transitions happen?'
-python3 - <<'PY'
-import json
-states = json.load(open('run.itf.json'))['states']
-def s(st): return next(v for k, v in st.items() if k.endswith('::s'))
-noop = sum(1 for a, b in zip(states, states[1:])
-           if s(a)['system'] == s(b)['system'] and s(a)['messages'] == s(b)['messages'])
-print('   steps changing neither system nor messages: %d of %d' % (noop, len(states) - 1))
-PY
-rm -f many_*.itf.json
-quint run two_phase_commit_tracked.qnt --mbt --seed=1 --max-steps=20 --n-traces=50 \
-    --max-samples=50 --out-itf='many_{seq}.itf.json' --verbosity=0
-python3 - <<'PY'
-import glob, json
-tot = noop = 0
+# Recording a transition is an effect, and choreo::step keeps a transition with
+# any effect, so it would stop dropping the ones that change nothing. The spec
+# filters them itself with changes_something. Measured with that filter, and
+# with it taken out of a copy.
+sed 's/ctx => main_listener(ctx).filter(t => changes_something(ctx, t))/main_listener/' \
+    two_phase_commit_tracked.qnt > unfiltered.qnt
+noops() {
+    rm -f many_*.itf.json
+    quint run "$1" --mbt --seed=1 --max-steps=20 --n-traces=50 --max-samples=50 \
+        --out-itf='many_{seq}.itf.json' --verbosity=0
+    python3 - "$1" <<'PY'
+import glob, json, sys
+tot = noop = longest = 0
 for f in glob.glob('many_*.itf.json'):
     states = json.load(open(f))['states']
     s = lambda st: next(v for k, v in st.items() if k.endswith('::s'))
+    longest = max(longest, len(states) - 1)
     for a, b in zip(states, states[1:]):
         tot += 1
         noop += s(a)['system'] == s(b)['system'] and s(a)['messages'] == s(b)['messages']
-print('   across 50 traces of 20 steps: %d of %d, %.0f%%' % (noop, tot, 100.0 * noop / tot))
+print('   %-30s %4d of %4d steps change nothing (%2.0f%%); longest trace %d steps'
+      % (sys.argv[1], noop, tot, 100.0 * noop / tot, longest))
 PY
-echo '   -> yes: every transition now has an effect, so choreo::step no longer'
-echo '      filters out the ones that change nothing'
+}
+noops two_phase_commit_tracked.qnt
+noops unfiltered.qnt
+echo '   -> without the filter most steps repeat an instruction already acted on;'
+echo '      with it, none do, and a trace ends when the protocol does'
 
 say '5. quint verify on a Choreo spec'
 mkdir -p scratch

@@ -18,7 +18,7 @@
   (with-redefs [tpc/handle-abort! (fn [node]
                                     (when (= :working (get-in @tpc/nodes [node :stage]))
                                       (swap! tpc/nodes assoc-in [node :stage] :aborted)))]
-    (qt/check two-phase-commit {:traces 50 :max-steps 20})))
+    (qt/check two-phase-commit {:traces 50 :max-samples 500 :max-steps 20})))
 
 (deftest ^:broken a-coordinator-must-tell-everyone
   ;; Commits, and forgets to say so. The scripted run reaches it every time,

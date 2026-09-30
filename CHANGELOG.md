@@ -23,7 +23,11 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
   That reaches `check`, `check-run` and `replay-file`, reports coverage per
   transition, and lets the implementation's own functions be annotated with the
-  transitions they implement. The recipe is [docs/choreo.md](docs/choreo.md);
+  transitions they implement. The instrumentation keeps Choreo's rule of
+  dropping transitions that change nothing — without it three steps in four
+  repeated an instruction already acted on — and with that, `:max-samples`
+  above `:traces` steers Quint toward a protocol's deepest paths, since it
+  writes the longest of its attempts. The recipe is [docs/choreo.md](docs/choreo.md);
   the reasoning is [0013](docs/decisions/0013-choreo-state-path.md).
 
 - **`:state-path`** in the driver map. The compared state becomes the record
