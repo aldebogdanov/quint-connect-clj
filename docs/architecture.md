@@ -62,6 +62,7 @@ and artifact (`org.clojars.aldebogdanov/quint-connect`).
 | namespace                 | kind       | responsibility                                                                                                                    |
 | ------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `…quint-connect.itf`      | pure       | ITF JSON -> EDN. Decode `#bigint`/`#map`/`#set`/`#tup`, records, sum types. Normalize variable names, split out `mbt::` metadata. |
+| `…quint-connect.itf.paths` | pure      | Read a decoded state through the driver's `:state-path`, `:action-path` and `:nondet-path`. Sees no JSON.                        |
 | `…quint-connect.registry` | reflective | Read `:quint/*` metadata from an explicit list of namespaces; produce driver data. The only namespace that reflects.              |
 | `…quint-connect.registry.validation` | pure | Decide whether what the registry read can be used, and say why not. Reflects over nothing.                        |
 | `…quint-connect.replay`   | engine     | Run the loop: init, act, read, compare. No I/O of its own.                                                                        |
@@ -71,38 +72,39 @@ and artifact (`org.clojars.aldebogdanov/quint-connect`).
 | `…quint-connect.test`     | glue       | `clojure.test` integration, and the one place that writes a failing trace to disk.                                                |
 | `…quint-connect.cli`      | impure     | `-main` for generating and caching traces outside a test run (M8).                                                                |
 
-Nine namespaces, none of which application code ever loads. If one passes
-~200 lines, that is a signal to stop and reconsider, not to split it reflexively.
+Ten namespaces, none of which application code ever loads. About 200 lines
+is a **recommendation, not a limit**: approaching it is the signal to stop and
+look for a seam. Where there is one, the namespace is split; where there is
+none, why it is the size it is gets written down here. Never split
+reflexively, and never to get under a number.
 
-Three have passed it. `itf` stands at 339, `quint` at 299 and `replay` at
-233.
+**Split, twice.** `registry` reached 278 when `:bad-arglist` and
+`:bad-state-spec` were added, and had a seam worth an extra file: `registry`
+reads — `ns-interns`, `meta`, `deref` — and `registry.validation` decides what
+the reading is allowed to mean. Nothing in validation reflects, which is why
+the rule confining reflection to `registry` still reads the way it did.
 
-`registry` reached 278 when `:bad-arglist` and `:bad-state-spec` were added,
-and was split rather than accepted, because this one had a seam worth an extra
-file: `registry` reads — `ns-interns`, `meta`, `deref` — and
-`registry.validation` decides what the reading is allowed to mean. Nothing in
-validation reflects, which is why the rule confining reflection to `registry`
-still reads the way it did. The halves are 157 and 159 lines.
+`itf` reached 339 with M9, having been 230 at M7b and 289 after 0.6.1's
+checks on every tag's shape. It split along the seam that had become visible:
+`itf` turns ITF into values, and `itf.paths` reads a decoded state through the
+driver's three paths. They share nothing but the shape of a decoded state,
+handed over by one call to `paths/tracked`, and `itf.paths` never sees JSON.
 
-`itf` was accepted at 230 on the condition that M7b not grow it, and M7b did
-not: Apalache's dialect decodes through it unchanged, and `#unserializable`
-never appeared, so the namespace is untouched since M7a. That condition held
-and is now discharged.
+**Over the recommendation, and staying there** — sizes as of M9:
 
-It has grown twice since, and **is open for discussion at 339**. 0.6.1 took it
-to 289 with the shape checks on every tag, and M9 to 339 with `:state-path`,
-the empty tuple as no picks, and the check that the paths leave something to
-compare — most of it docstrings and error messages. The seam, if one is wanted,
-is already visible: decoding values (`#bigint`, `#map`, the bignumber form)
-and reading the decoded state through the driver's paths (`tracked` and the
-five functions it calls) share nothing but `fail`. Nothing has been split,
-because CLAUDE.md asks for that to be discussed first.
-
-`quint` grew with `verify!` and is **accepted at 264 for now**, deliberately.
-It is three commands against one CLI, sharing the version check, the scratch
-directory and the collection of ITF files, and the seam a split would follow —
-one namespace per subcommand — would triplicate all three. A fourth subcommand
-is the moment to reopen it; until then the size is the lesser cost.
+- `itf`, 235. One job, ITF to values. Much of it is the shape check on every
+  tag and the bignumber reconstruction, and their error messages. Splitting
+  values from the trace around them would be a seam of convenience.
+- `quint`, 340. Three commands against one CLI, sharing the version floor, the
+  scratch directory and the collection of ITF files. One namespace per
+  subcommand would triplicate those. The other seam — running a process safely
+  versus what to ask Quint and what its answer means — is real, but it would
+  move the shelling-out into a namespace CLAUDE.md does not allow side effects
+  in, so it is a rule change before it is a refactor, and not taken here.
+- `replay`, 233. One loop: dispatch, call, read, compare, halt. Its parts are
+  small and each is used once, by that loop.
+- `registry.validation`, 231. Independent checks, each carrying the message
+  that makes it worth having. Nothing groups them but being checks.
 
 There is deliberately no keys namespace. An earlier design had one, existing
 only to be aliased so that `:quint/action` would resolve to a fully-qualified

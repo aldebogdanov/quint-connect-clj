@@ -118,5 +118,6 @@ can only say `"step"`.
   which checks them, writes no trace. The instrumented route asks nothing of a
   counterexample that a `quint test` trace does not already satisfy, but that
   is inference until one exists.
-- `itf` grows, and was already past the ~200 lines CLAUDE.md treats as a
-  signal. [architecture.md](../architecture.md) §3 says where it stands.
+- `itf` grew to 339 lines, and was then split along the seam that growth made
+  visible: `itf.paths` reads the decoded state through the three paths.
+  [architecture.md](../architecture.md) §3 says where each half stands.

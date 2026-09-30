@@ -53,6 +53,14 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ### Changed
 
+- **`itf` is split in two.** It reached 339 lines with `:state-path`, and
+  `itf.paths` now holds what the driver steers: reading a decoded state
+  through `:state-path`, `:action-path` and `:nondet-path`. `itf/itf->trace` is
+  unchanged. The ~200-line rule in CLAUDE.md is now a recommendation: split
+  where there is a seam, and where there is none, say why in
+  [architecture.md](docs/architecture.md) §3 — which now does, for `quint`,
+  `replay` and `registry.validation`.
+
 - **Quint 0.33.0 or later is required**, and an older one is `:quint-too-old`
   rather than a warning. 0.32.0 does not fail; it writes traces that decode
   cleanly and are wrong. Its rust evaluator left a dead-ended sample's action

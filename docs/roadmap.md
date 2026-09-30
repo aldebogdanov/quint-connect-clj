@@ -398,4 +398,7 @@ against `in app … "Prepared"`, naming `#'tpc.core/handle-abort!`.
 - **No committed trace in the example.** The other four examples generate
   rather than replay, and the example says so; `replay-file` on Choreo traces
   is covered by the library's own tests.
-- **`itf` is at 339 lines.** See [architecture.md](architecture.md) §3.
+- **`itf` reached 339 lines**, and after review was split: `itf.paths` now
+  reads a decoded state through the three paths, and the ~200-line rule became
+  a recommendation with reasons recorded. See [architecture.md](architecture.md)
+  §3.

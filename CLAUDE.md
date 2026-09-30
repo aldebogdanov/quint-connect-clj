@@ -43,8 +43,10 @@ Namespaces are written below by their last segment; all live under
 - **Clojure on the JVM only.** `.clj` files, no reader conditionals, no
   `#?(:clj ...)` "just in case".
 - Prefer duplication over an abstraction that has been used once.
-- A namespace approaching ~200 lines is a signal to stop and discuss, not to
-  split reflexively.
+- ~200 lines per namespace is a recommendation, not a limit. Approaching it is
+  the signal to stop and look for a seam: split where there is one, and where
+  there is none, record in [docs/architecture.md](docs/architecture.md) §3 why
+  the namespace is the size it is. Never split reflexively.
 - Docstrings on every public var: what it takes, what it returns, what it
   throws. No docstrings that restate the name.
 - Comments explain *why*. Delete commented-out code.
