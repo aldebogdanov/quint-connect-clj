@@ -46,6 +46,28 @@
                             (catch clojure.lang.ExceptionInfo e (ex-message e)))
                        "npm i -g @informalsystems/quint@0.33.0"))))
 
+(deftest temporal-is-refused-where-it-would-check-nothing
+  ;; Both refused before Quint runs, so this needs no Quint. What each would
+  ;; otherwise do is recorded by dev/probes/temporal_probe.sh.
+  (let [spec "dev/fixtures/choreo/two_phase_commit_tracked.qnt"]
+    (testing "under Apalache, which would wait on stdin, or exit 0 unchecked"
+      (is (= :bad-options (error-of #(quint/verify! {:spec spec :temporal "commitIsFinal"}))))
+      (is (= :bad-options (error-of #(quint/verify! {:spec spec :temporal "commitIsFinal"
+                                                     :backend :apalache}))))
+      (is (str/includes? (try (quint/verify! {:spec spec :temporal "commitIsFinal"})
+                              (catch clojure.lang.ExceptionInfo e (ex-message e)))
+                         ":backend :tlc")))
+    (testing "together with an invariant, where one verdict could not say which"
+      (is (= :bad-options (error-of #(quint/verify! {:spec spec :backend :tlc
+                                                     :invariant "consistency"
+                                                     :temporal "commitIsFinal"})))))
+    (testing "and neither is nothing to check"
+      (is (= :quint-failed (error-of #(quint/verify! {:spec spec})))))
+    (testing "otherwise it reaches Quint as --temporal"
+      (is (some #{"--temporal=commitIsFinal"}
+                (#'quint/verify-args {:spec spec :temporal "commitIsFinal" :backend :tlc}
+                                     "/scratch"))))))
+
 (deftest ^:integration reports-a-version
   (is (re-matches #"\d+\.\d+\.\d+" (quint/version))))
 

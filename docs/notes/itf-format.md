@@ -210,6 +210,38 @@ running Quint in the spec's own directory does have the effect the comment in
 assumption. If M7b runs
 `verify` from a scratch directory, this is the assumption it rests on.
 
+### `quint verify --temporal`, recorded 2026-09-30 on 0.33.0
+
+Reproducible with [`dev/probes/temporal_probe.sh`](../../dev/probes/temporal_probe.sh),
+on the example from Quint 0.33.0's release announcement: `x` counts from 1 to
+3, `increasing = always((next(x) > x).orKeep(x))` holds and
+`jumps = always((next(x) > x + 1).orKeep(x))` does not.
+
+| backend, and how it is run            | `jumps` (violated)            | trace |
+| ------------------------------------- | ----------------------------- | ----- |
+| Apalache, stdin closed                | **exit 0**, nothing checked   | no    |
+| Apalache, stdin open and unanswered   | waits for ever (killed at 60 s) | no  |
+| TLC                                   | exit 1, `found a counterexample` | no |
+
+**Under Apalache, Quint asks first.** Its temporal support is experimental,
+and `quint verify` prints a warning and then `Do you want to proceed with
+Apalache anyway? (y/N)` on stdin (`askUserYesNo` in `cliCommands.ts`). With
+stdin closed the process exits **0** — which reads as "holds" for a property
+that is violated. Why is inference, not a recording: readline's question is
+never answered, so its callback never runs, and Node exits once its event loop
+is empty, with the default status. Left open, it waits. Neither is a verdict,
+which is why `:temporal` is refused without `:backend :tlc`.
+
+**Under TLC, no trace, and no bound.** `increasing` exits 0, `jumps` exits 1
+with `error: found a counterexample`, and neither writes `--out-itf`. TLC is run
+with `-deadlock` and no depth (`tlc.ts`), so `--max-steps` is ignored: a spec
+whose `n' = n + 1` never stops is still running when the probe kills it.
+
+**One verdict for two kinds of property.** `--invariant=small --temporal=...`
+under TLC exits 1 with the same first line whether the temporal property holds
+or not, so nothing says which one was violated. Hence one or the other per
+call.
+
 ## Choreo, recorded 2026-09-30 on 0.32.0
 
 [Choreo](https://github.com/informalsystems/choreo)'s two-phase commit, vendored
@@ -329,7 +361,8 @@ checked only with TLC — work on the same spec: `always(... implies
 next(stage) == Committed).orKeep(choreo::s)`, "a committed participant stays
 committed", holds with `--temporal`, and one saying the coordinator's stage
 never changes is violated with `error: found a counterexample`. No trace for
-either. This library's `verify` passes `--invariant` only.
+either. This library's `verify` takes them as `:temporal`, under `:backend
+:tlc` only — see §`quint verify --temporal` below.
 
 **Imports resolve relative to the importing file.** `choreo.qnt` imports
 `"spells/basicSpells"` and finds it beside itself wherever it is vendored, and

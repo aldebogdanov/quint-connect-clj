@@ -95,7 +95,7 @@ handed over by one call to `paths/tracked`, and `itf.paths` never sees JSON.
 - `itf`, 235. One job, ITF to values. Much of it is the shape check on every
   tag and the bignumber reconstruction, and their error messages. Splitting
   values from the trace around them would be a seam of convenience.
-- `quint`, 340. Three commands against one CLI, sharing the version floor, the
+- `quint`, 368. Three commands against one CLI, sharing the version floor, the
   scratch directory and the collection of ITF files. One namespace per
   subcommand would triplicate those. The other seam — running a process safely
   versus what to ask Quint and what its answer means — is real, but it would
@@ -439,7 +439,7 @@ file and line of the function that diverged and at the one that observed it.
 | ------------ | ------------------------------------- | ------------------------------------------------------------- |
 | `check`      | `quint run --mbt` (N random traces)   | the default: broad conformance testing                        |
 | `check-run`  | `quint test --match ^name$`           | one scripted scenario from a Quint `run` (see caveat below)   |
-| `verify`     | `quint verify --invariant I`          | prove the spec, then replay the counterexample if there is one |
+| `verify`     | `quint verify --invariant I` or `--temporal P` | prove the spec, then replay the counterexample if there is one |
 | `replay-file`| a committed `.itf.json`               | regression tests, CI without Quint                              |
 
 Caveat, verified against Quint 0.32.0: **`quint test` does not accept `--mbt`**

@@ -159,9 +159,22 @@
   (let [e (try (q/verify tracked {:invariant "wit_commit" :backend :tlc})
                (catch clojure.lang.ExceptionInfo e e))]
     (is (= :quint-failed (:quint/error (ex-data e))))
-    (is (str/includes? (ex-message e) "Under TLC a violated invariant looks the same"))
+    (is (str/includes? (ex-message e) "Under TLC a violated property looks the same"))
     (is (str/includes? (ex-message e) "found a counterexample")
         "the verdict is Quint's, quoted")))
+
+(deftest ^:slow an-action-property-that-holds-passes-under-tlc
+  (let [r (q/verify tracked {:temporal "commitIsFinal" :backend :tlc})]
+    (is (:ok? r))
+    (is (= {:name "commitIsFinal" :holds? true} (:temporal r)))
+    (is (nil? (:invariant r)))))
+
+(deftest ^:slow a-violated-action-property-under-tlc-says-what-happened
+  (let [e (try (q/verify tracked {:temporal "coordinatorNeverMoves" :backend :tlc})
+               (catch clojure.lang.ExceptionInfo e e))]
+    (is (= :quint-failed (:quint/error (ex-data e))))
+    (is (= "coordinatorNeverMoves" (:temporal (ex-data e))))
+    (is (str/includes? (ex-message e) "found a counterexample"))))
 
 (deftest ^:integration choreo-as-written-checks-through-one-adapter
   (qt/check as-written {:traces 20 :max-steps 12 :seed 42}))

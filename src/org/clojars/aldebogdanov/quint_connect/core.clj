@@ -129,6 +129,12 @@
   `:action-path` a scripted run needs; without it replay throws
   `:unknown-action`.
 
+  `:temporal` names a `temporal` definition instead — an action property, say
+  — and needs `:backend :tlc`. One that holds returns `:ok? true` with
+  `:temporal {:name \"commitIsFinal\" :holds? true}`. One that does not is the
+  `:quint-failed` `quint/verify!` throws: TLC writes no counterexample, so
+  there is nothing to replay and no result to build around it.
+
   Throws whatever `quint/verify!` and `replay/run-trace` throw."
   [driver opts]
   (let [o (merge driver (opts! opts))
@@ -136,7 +142,8 @@
         base {:seed nil :cmd cmd :dir dir}]
     (if holds?
       (assoc base :ok? true :traces 0 :steps 0
-             :invariant {:name (:invariant o) :holds? true}
+             (if (:temporal o) :temporal :invariant)
+             {:name (or (:temporal o) (:invariant o)) :holds? true}
              :coverage (coverage driver {})
              :failure nil)
       (let [{:keys [name json]} (first traces)

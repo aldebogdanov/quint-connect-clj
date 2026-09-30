@@ -205,6 +205,14 @@ module two_phase_commit {
 
   val wit_commit = PARTICIPANTS.exists(p => choreo::s.system.get(p).stage != Committed)
 
+  // An action property: about transitions, not states (Quint 0.33.0, TLC
+  // only). A participant that has committed stays committed. Not Choreo's.
+  temporal commitIsFinal = always(
+    PARTICIPANTS.forall(p =>
+      choreo::s.system.get(p).stage == Committed
+        implies next(choreo::s.system.get(p).stage) == Committed
+    ).orKeep(choreo::s))
+
   action step_with(v: Node, listener: LocalContext => Set[Transition]): bool =
     choreo::step_with(v, ctx => listener(ctx).filter(t => changes_something(ctx, t)),
                       apply_custom_effects)

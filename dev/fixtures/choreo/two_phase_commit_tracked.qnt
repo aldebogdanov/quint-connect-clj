@@ -1,8 +1,9 @@
 // Derived from informalsystems/choreo at 000cf4e, examples/two_phase_commit/,
 // Apache-2.0; see LICENSE beside this file. Changed: every transition records
 // which one it was, step and step_with keep Choreo's filter of transitions that
-// change nothing, and the import paths point beside this file. The protocol
-// logic -- every guard, post-state and message -- is Choreo's, unchanged.
+// change nothing, two action properties are added for verify, and the import
+// paths point beside this file. The protocol logic -- every guard, post-state
+// and message -- is Choreo's, unchanged.
 //
 // Why: Choreo never names a transition, so a trace carries only its outcome,
 // and an implementation cannot be driven by name without this. The
@@ -203,6 +204,19 @@ module two_phase_commit_tracked {
   })
 
   val wit_commit = PARTICIPANTS.exists(p => choreo::s.system.get(p).stage != Committed)
+
+  // Action properties: about transitions, not states (Quint 0.33.0, TLC only).
+  // A participant that has committed stays committed.
+  temporal commitIsFinal = always(
+    PARTICIPANTS.forall(p =>
+      choreo::s.system.get(p).stage == Committed
+        implies next(choreo::s.system.get(p).stage) == Committed
+    ).orKeep(choreo::s))
+
+  // Violated on purpose: the coordinator decides, so its stage does change.
+  temporal coordinatorNeverMoves = always(
+    (next(choreo::s.system.get(COORDINATOR).stage) == choreo::s.system.get(COORDINATOR).stage)
+      .orKeep(choreo::s))
 
   action step_with(v: Node, listener: LocalContext => Set[Transition]): bool =
     choreo::step_with(v, ctx => listener(ctx).filter(t => changes_something(ctx, t)),

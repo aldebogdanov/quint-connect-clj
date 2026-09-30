@@ -177,9 +177,18 @@ diverged at step 4, action "DecidesOnCommit"
 - **`verify` runs through TLC only, and replays nothing.** Apalache rejects
   every Choreo spec with an internal type-checking error — the cause is a
   state variable whose type is left generic until the module is instantiated,
-  which is what Choreo's `s` is. `{:backend :tlc}` checks the spec: an
-  invariant that holds passes, and one that does not says so, but Quint writes
-  no trace from TLC, so there is no counterexample to replay here.
+  which is what Choreo's `s` is. `{:backend :tlc}` checks the spec: a property
+  that holds passes, and one that does not says so, but Quint writes no trace
+  from TLC, so there is no counterexample to replay here. The `^:slow` test in
+  [test/tpc/model_test.clj](test/tpc/model_test.clj) checks the invariant
+  `consistency` and the action property `commitIsFinal` — a participant that
+  has committed stays committed — that way:
+
+  ```clojure
+  (qt/verify two-phase-commit {:temporal "commitIsFinal" :backend :tlc})
+  ```
+
+  `clojure -M:test -e :slow` leaves it out.
 
 ## What to look at
 

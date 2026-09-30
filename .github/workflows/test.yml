@@ -78,7 +78,9 @@ jobs:
       - run: cd examples/counter && clojure -M:test:local
       - run: cd examples/lru && clojure -M:test:local
       - run: cd examples/queue && clojure -M:test:local
-      - run: cd examples/two-phase-commit && clojure -M:test:local
+      # two-phase-commit's ^:slow test runs TLC, which needs Apalache's
+      # distribution; like tokens, it stays out of CI.
+      - run: cd examples/two-phase-commit && clojure -M:test:local -e :slow
       # tokens has ^:slow verify tests; -e :slow keeps Apalache out of CI.
       - run: cd examples/tokens && clojure -M:test:local -e :slow
 

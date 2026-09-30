@@ -30,6 +30,16 @@ follow [semantic versioning](https://semver.org/) from its first release.
   writes the longest of its attempts. The recipe is [docs/choreo.md](docs/choreo.md);
   the reasoning is [0013](docs/decisions/0013-choreo-state-path.md).
 
+- **`:temporal` for `verify`**: check a `temporal` definition — Quint 0.33.0's
+  action properties included — where `:invariant` checks a `val`. It needs
+  `:backend :tlc` and is `:bad-options` without it: under Apalache Quint asks
+  on stdin whether to go ahead, and unanswered it waits for ever, or, with
+  stdin closed, exits 0 having checked nothing — recorded with
+  `dev/probes/temporal_probe.sh`. It is `:bad-options` alongside `:invariant`
+  too, since Quint gives the two one verdict. A holding property is `:ok? true`
+  with `:temporal {:name .. :holds? true}`; a violated one is `:quint-failed`
+  quoting Quint's `found a counterexample`, as TLC writes no trace to replay.
+
 - **`:state-path`** in the driver map. The compared state becomes the record
   found there, and its fields stand in for spec variables, so a reader is
   annotated `{:quint/state :system}` as it would be for a spec with a variable

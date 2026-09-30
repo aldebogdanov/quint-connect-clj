@@ -343,6 +343,35 @@ Two things to know before you reach for it:
   run on every save — this repository uses `^:slow` and a `bb test:verify`
   task.
 
+### Temporal properties, and TLC
+
+`:temporal` names a `temporal` definition instead of an invariant — including
+Quint 0.33.0's action properties, which are about what a step may do rather
+than what a state may be. Refusing should change nothing:
+
+```
+  temporal refusingChangesNothing =
+    always((next(lastOp) == "refused" implies next(count) == count).orKeep(count))
+```
+
+```clojure
+(qt/verify counter {:temporal "refusingChangesNothing" :backend :tlc})
+```
+
+It needs `:backend :tlc`, and is refused without it: under Apalache, Quint
+first asks on stdin whether to go ahead, and unanswered it either waits for
+ever or, with stdin closed, exits 0 having checked nothing. It is also refused
+alongside `:invariant`, because Quint gives one verdict for the two.
+
+TLC changes three things. It writes no trace, so a violated property is a
+`:quint-failed` quoting Quint's `found a counterexample`, with nothing to
+replay. It ignores `:max-steps` and explores every reachable state, so the
+state space has to be finite — and this counter's is not, since `add` has no
+ceiling. With `count + n <= 20` added to `add`, the property above holds, and
+`always((next(count) >= count).orKeep(count))` is found violated, as `take`
+says it should be. And TLC is the only checker that accepts a Choreo spec at
+all; see [choreo.md](choreo.md).
+
 ## 9. A spec written with Choreo
 
 [Choreo](https://github.com/informalsystems/choreo) specs keep all of their

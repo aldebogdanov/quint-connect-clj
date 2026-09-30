@@ -323,6 +323,24 @@ counterexample`. Quint writes a trace only from Apalache, so there is no
 counterexample to replay against the implementation. What TLC gives you is the
 answer about the spec.
 
+Action properties — Quint 0.33.0's temporal properties about transitions —
+are checked the same way, with `:temporal` in place of `:invariant`:
+
+```quint
+temporal commitIsFinal = always(
+  PARTICIPANTS.forall(p =>
+    choreo::s.system.get(p).stage == Committed
+      implies next(choreo::s.system.get(p).stage) == Committed
+  ).orKeep(choreo::s))
+```
+
+```clojure
+(q/verify two-phase-commit {:temporal "commitIsFinal" :backend :tlc})
+```
+
+TLC explores every reachable state and ignores `:max-steps`, which a Choreo
+spec with a fixed set of nodes and a protocol that terminates can afford.
+
 ## Reference
 
 - [examples/two-phase-commit/](../examples/two-phase-commit/) — all of the

@@ -74,3 +74,12 @@
   ;; the run commitTest, and replayed here step by step.
   (let [r (qt/check-run two-phase-commit {:test "commitTest"})]
     (is (= 3 (get-in r [:coverage :used "CommitsAsInstructed"])))))
+
+(deftest ^:slow the-spec-keeps-its-promises
+  ;; verify, through TLC: Apalache rejects every Choreo spec, for the reason in
+  ;; docs/choreo.md. TLC explores every reachable state, and writes no trace,
+  ;; so these are verdicts about the spec, with nothing to replay against the
+  ;; code. `consistency` is an invariant about states; `commitIsFinal` is an
+  ;; action property, about what a step may do.
+  (qt/verify two-phase-commit {:invariant "consistency" :backend :tlc})
+  (qt/verify two-phase-commit {:temporal "commitIsFinal" :backend :tlc}))

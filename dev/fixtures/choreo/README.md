@@ -13,7 +13,7 @@ Taken from commit `000cf4eed315187dc6f216a148781cff7dde6521` (2026-06-23).
 | `spells/basicSpells.qnt` | Choreo's, byte for byte |
 | `LICENSE` | Choreo's, byte for byte |
 | `two_phase_commit.qnt` | Choreo's `examples/two_phase_commit/two_phase_commit.qnt`, with its two import paths pointed beside it and a header saying so |
-| `two_phase_commit_tracked.qnt` | ours, derived from the above: every transition records which one it was in `s.extensions.actionTaken`, and `step` and `step_with` keep Choreo's rule of dropping transitions that change nothing. Protocol logic unchanged |
+| `two_phase_commit_tracked.qnt` | ours, derived from the above: every transition records which one it was in `s.extensions.actionTaken`, `step` and `step_with` keep Choreo's rule of dropping transitions that change nothing, and two action properties are added for `verify` — `commitIsFinal`, which holds, and `coordinatorNeverMoves`, violated on purpose. Protocol logic unchanged |
 
 ## Recordings
 

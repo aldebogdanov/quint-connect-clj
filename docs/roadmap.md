@@ -395,6 +395,11 @@ against `in app … "Prepared"`, naming `#'tpc.core/handle-abort!`.
   With it, a run ends when the protocol does, which is also what makes
   `:max-samples` useful: Quint writes the longest of its attempts, and 500
   attempts for 50 traces put ten commits among them instead of one.
+- **`:temporal` for `verify`, after review.** TLC is the one checker that
+  accepts a Choreo spec, and Quint 0.33.0's action properties are checked with
+  it, so `verify` takes `:temporal` — under `:backend :tlc` only, because under
+  Apalache Quint asks on stdin first and, unanswered, exits 0 having checked
+  nothing. Recorded with `dev/probes/temporal_probe.sh`.
 - **No committed trace in the example.** The other four examples generate
   rather than replay, and the example says so; `replay-file` on Choreo traces
   is covered by the library's own tests.
