@@ -277,6 +277,7 @@ dev/probes/                    scripts that verified the claims in the docs
 docs/architecture.md
 docs/choreo.md                 testing against a Choreo spec, step by step
 docs/roadmap.md
+docs/techdebt.md               known gaps, written down and not scheduled
 docs/decisions/                ADRs — why the design is what it is
 docs/notes/                    observed behaviour of Quint and of var metadata
 docs/upstream/                 changes proposed to the tools this depends on

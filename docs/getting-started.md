@@ -458,7 +458,7 @@ recorded failure a deterministic regression test — see §6.
   participant that aborts on its own after voting yes — a real safety bug —
   passes `check` with 500 attempts on every seed tried, because no trace ever
   asks a prepared participant to abort. Catching that needs a different kind of
-  test; see [roadmap](roadmap.md) §M8, "Refusal checks".
+  test; see [techdebt.md](techdebt.md), "Refusal checks".
 
 - **0.6.1 is an early release.** The API is the one described here and is not
   expected to move, but nothing has been used in anger by anyone but its
