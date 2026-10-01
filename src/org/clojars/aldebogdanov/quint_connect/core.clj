@@ -102,8 +102,9 @@
     (assoc (replay-all driver (quint/test! o)) :test (:test o))))
 
 (defn verify
-  "Check an invariant with Apalache, and replay the counterexample if there is
-  one.
+  "Check a property of the spec — an invariant, or with `:temporal` a temporal
+  one — and replay the counterexample against the implementation when Quint
+  writes one, which it does only from Apalache.
 
   Takes a resolved driver and an options map merged over it; `:invariant` names
   a `val` in the spec and is required. `:max-steps` bounds the search. Returns
