@@ -6,6 +6,10 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
+Nothing since 0.7.0.
+
+## [0.7.0] — 2026-10-01
+
 ### Added
 
 - **Specs written with [Choreo](https://github.com/informalsystems/choreo).**

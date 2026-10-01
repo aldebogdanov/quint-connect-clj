@@ -3,11 +3,11 @@
 Model-based testing for Clojure, driven by [Quint](https://quint-lang.org/)
 specifications.
 
-Status: **0.6.1**. Every planned milestone in
+Status: **0.7.0**. Every planned milestone in
 [docs/roadmap.md](docs/roadmap.md) is done — decoding, replay, the annotation
 registry, the Quint CLI, the public API, failure artifacts, scripted runs,
 `verify`, and specs written with [Choreo](https://github.com/informalsystems/choreo)
-(unreleased: [docs/choreo.md](docs/choreo.md)). `bb test` runs a real
+([docs/choreo.md](docs/choreo.md)). `bb test` runs a real
 model-based test end to end, needing no Quint.
 What is still rough is listed honestly in
 [getting-started](docs/getting-started.md#rough-edges-honestly).
@@ -40,7 +40,7 @@ no return-value convention, no require. This is the Clojure counterpart of
 
 ```clojure
 ;; belongs in a :test alias and nowhere else
-org.clojars.aldebogdanov/quint-connect {:mvn/version "0.6.1"}
+org.clojars.aldebogdanov/quint-connect {:mvn/version "0.7.0"}
 ```
 
 ## Usage
