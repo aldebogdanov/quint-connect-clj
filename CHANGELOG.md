@@ -6,7 +6,120 @@ follow [semantic versioning](https://semver.org/) from its first release.
 
 ## [Unreleased]
 
-Nothing since 0.6.1.
+### Added
+
+- **Specs written with [Choreo](https://github.com/informalsystems/choreo).**
+  Choreo keeps all of a spec's state in one variable, `s`, and names none of
+  its transitions: under `--mbt` every step is `"step"`, and `quint test`
+  records no picks at all. The spec now records each transition in
+  `s.extensions` — the convention quint-connect (Rust) uses — and the driver
+  map says where things are:
+
+  ```clojure
+  {:state-path  [:s]
+   :action-path [:extensions :actionTaken :tag]
+   :nondet-path [:extensions :actionTaken :value]}
+  ```
+
+  That reaches `check`, `check-run` and `replay-file`, reports coverage per
+  transition, and lets the implementation's own functions be annotated with the
+  transitions they implement. The instrumentation keeps Choreo's rule of
+  dropping transitions that change nothing — without it three steps in four
+  repeated an instruction already acted on — and with that, `:max-samples`
+  above `:traces` steers Quint toward a protocol's deepest paths, since it
+  writes the longest of its attempts. The recipe is [docs/choreo.md](docs/choreo.md);
+  the reasoning is [0013](docs/decisions/0013-choreo-state-path.md).
+
+- **`:temporal` for `verify`**: check a `temporal` definition — Quint 0.33.0's
+  action properties included — where `:invariant` checks a `val`. **It checks
+  the spec only**: no trace comes back from TLC, so the implementation is never
+  run. It needs
+  `:backend :tlc` and is `:bad-options` without it: under Apalache Quint asks
+  on stdin whether to go ahead, and unanswered it waits for ever, or, with
+  stdin closed, exits 0 having checked nothing — recorded with
+  `dev/probes/temporal_probe.sh`. It is `:bad-options` alongside `:invariant`
+  too, since Quint gives the two one verdict. A holding property is `:ok? true`
+  with `:temporal {:name .. :holds? true}`; a violated one is `:quint-failed`
+  quoting Quint's `found a counterexample`, as TLC writes no trace to replay.
+
+- **`:state-path`** in the driver map. The compared state becomes the record
+  found there, and its fields stand in for spec variables, so a reader is
+  annotated `{:quint/state :system}` as it would be for a spec with a variable
+  of that name. `:action-path` and `:nondet-path` are read inside it.
+  `:bad-decode-path` when it is not a vector, finds nothing — the message then
+  lists the variables there are — or finds something that is not a record.
+
+- **The empty tuple at `:nondet-path` is no picks.** A variant without an
+  argument, such as Choreo's `Init`, carries it as its value.
+
+- [examples/two-phase-commit/](examples/two-phase-commit/): Choreo's own
+  two-phase commit, instrumented, driving a Clojure implementation under
+  `check` and `check-run`, with a participant that ignores an abort and a
+  coordinator that forgets to broadcast as its broken versions. CI runs it.
+
+- Choreo vendored at a pinned commit, with its Apache-2.0 licence, in
+  `dev/fixtures/choreo/` and in the example; nothing of it reaches the jar.
+  See [0012](docs/decisions/0012-vendor-choreo.md). Four recordings of it, and
+  [`dev/probes/choreo_probe.sh`](dev/probes/choreo_probe.sh) to re-check what
+  they show.
+
+### Changed
+
+- **`itf` is split in two.** It reached 339 lines with `:state-path`, and
+  `itf.paths` now holds what the driver steers: reading a decoded state
+  through `:state-path`, `:action-path` and `:nondet-path`. `itf/itf->trace` is
+  unchanged. The ~200-line rule in CLAUDE.md is now a recommendation: split
+  where there is a seam, and where there is none, say why in
+  [architecture.md](docs/architecture.md) §3 — which now does, for `quint`,
+  `replay` and `registry.validation`.
+
+- **Quint 0.33.0 or later is required**, and an older one is `:quint-too-old`
+  rather than a warning. 0.32.0 does not fail; it writes traces that decode
+  cleanly and are wrong. Its rust evaluator left a dead-ended sample's action
+  and picks in storage, where the next sample's `init` could not overwrite
+  them, so state 0 of later traces said `"step"` with picks no transition used
+  (Quint #2012, fixed in 0.33.0). A driver handling `"step"` itself — Choreo as
+  written — was handed the initial state instead of `init` running. Every
+  fixture re-recorded on 0.33.0 identically but for timestamps, except the one
+  that records the bug. CI installs 0.33.0, whose Apalache 0.62.1 needs Java 21.
+  See [0014](docs/decisions/0014-quint-floor.md).
+
+### Fixed
+
+- **A diverging `check-run` is named after its run.** It was headed
+  `diverged on trace 0 of 1, seed ` — with nothing after "seed" — and saved as
+  `<spec>-seed-trace0.itf.json`, because both were written for random runs,
+  where the seed is what identifies a trace. A scripted run is identified by
+  its name and has a seed only if one was passed. Now: `diverged on run
+  "commitTest"`, saved as `<spec>-commitTest.itf.json`, and the result carries
+  `:test`. No seed is generated for it: `quint test` tries a randomized run
+  once when given a seed and up to 10000 times without one, so inventing one
+  would change what the run tests.
+
+- **`verify` under `:backend :tlc` no longer calls a violation a broken
+  setup.** Quint writes `--out-itf` only from Apalache, so a TLC counterexample
+  exits 1 with no trace — which `verify!` reported as "the invariant was never
+  checked; the spec or the invariant name is the likely cause". It is still
+  `:quint-failed`, since there is nothing to replay, but the message now says
+  what that outcome means under TLC and quotes Quint's first line, which is
+  where the verdict is.
+
+- **Paths that leave nothing to compare are refused instead of passing.**
+  `:action-path [:s :extensions :actionTaken :tag]` reads the right action and
+  then removes `s` — all of a Choreo spec's state — as the path's root. Replayed
+  through driver-map handlers that did nothing at all, the recorded
+  `commitTest` trace passed all eight steps. With `:nondet-path` set as well it
+  failed, but only on `Init`'s empty tuple, which this release accepts. Both
+  are now `:bad-decode-path`, and the message names `:state-path`.
+
+### Recorded, not worked around
+
+- `quint verify` through Apalache fails on every Choreo spec: a state
+  variable whose type has a type parameter fixed only by instantiating the
+  module — Choreo's `s` — is rejected by Apalache's type checker, from Quint
+  0.28.0 to 0.33.0. Reduced to thirteen lines in
+  [notes/itf-format.md](docs/notes/itf-format.md) §Choreo. `{:backend :tlc}`
+  checks Choreo specs instead, and writes no trace to replay.
 
 ## [0.6.1] — 2026-09-09
 

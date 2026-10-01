@@ -17,7 +17,8 @@
    "examples/counter/deps.edn"
    "examples/lru/deps.edn"
    "examples/queue/deps.edn"
-   "examples/tokens/deps.edn"])
+   "examples/tokens/deps.edn"
+   "examples/two-phase-commit/deps.edn"])
 
 (defn- die [& msg]
   (binding [*out* *err*] (println (str/join " " msg)))

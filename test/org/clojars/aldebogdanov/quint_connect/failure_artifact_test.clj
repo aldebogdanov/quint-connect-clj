@@ -129,3 +129,33 @@
     (is (= 1 (count (.listFiles (io/file dir)))))
     (is (= (str (io/file dir "tracked-underFifty-counterexample.itf.json"))
            (get-in saved [:invariant :saved])))))
+
+;; --- a scripted run is identified by its name -------------------------------
+
+(def ^:private run-recorded
+  (slurp "dev/fixtures/choreo/tpc_tracked_test_commitTest.itf.json"))
+
+(def ^:private scripted
+  {:ok?     false
+   :seed    nil
+   :test    "commitTest"
+   :traces  1
+   :cmd     ["quint" "test" "two_phase_commit.qnt" "--out-itf=test_{test}_{seq}.itf.json"
+             "--verbosity=0" "--match=^commitTest$"]
+   :failure {:trace 0 :trace-name "test_commitTest_0.itf.json" :trace-json run-recorded
+             :step 4 :action "DecidesOnCommit"}})
+
+(deftest a-scripted-run-is-saved-under-its-name-not-a-seed
+  ;; It used to be two_phase_commit-seed-trace0.itf.json: no seed was passed,
+  ;; and the name was built for random runs, where the seed is the identity.
+  (let [dir  (temp-dir)
+        path (get-in (qt/save-failure! scripted {:dir dir}) [:failure :saved])]
+    (is (= (str (io/file dir "two_phase_commit-commitTest.itf.json")) path))
+    (is (= run-recorded (slurp path)))))
+
+(deftest a-scripted-run-is-reported-by-its-name
+  (let [s (report/result-str scripted)]
+    (is (str/includes? s "diverged on run \"commitTest\""))
+    (is (not (str/includes? s "seed")) "there is no seed to name")
+    (is (str/includes? (report/result-str (assoc scripted :seed 7)) "run \"commitTest\", seed 7")
+        "unless one was passed")))

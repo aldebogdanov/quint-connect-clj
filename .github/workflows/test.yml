@@ -61,7 +61,7 @@ jobs:
       # Pinned: the fixtures are recordings of this version, and a newer Quint
       # changing its ITF output is exactly the drift the tests exist to catch.
       # Bump it deliberately, with the fixtures, not by floating.
-      - run: npm i -g @informalsystems/quint@0.32.0
+      - run: npm i -g @informalsystems/quint@0.33.0
 
       - uses: actions/cache@v4
         with:
@@ -78,6 +78,9 @@ jobs:
       - run: cd examples/counter && clojure -M:test:local
       - run: cd examples/lru && clojure -M:test:local
       - run: cd examples/queue && clojure -M:test:local
+      # two-phase-commit's ^:slow test runs TLC, which needs Apalache's
+      # distribution; like tokens, it stays out of CI.
+      - run: cd examples/two-phase-commit && clojure -M:test:local -e :slow
       # tokens has ^:slow verify tests; -e :slow keeps Apalache out of CI.
       - run: cd examples/tokens && clojure -M:test:local -e :slow
 
@@ -104,6 +107,6 @@ jobs:
         with:
           node-version: '20'
 
-      - run: npm i -g @informalsystems/quint@0.32.0
+      - run: npm i -g @informalsystems/quint@0.33.0
 
       - run: bb test:verify

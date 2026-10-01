@@ -1,7 +1,10 @@
 # Getting started
 
 From an empty directory to a model-based test that finds a real bug. Every
-command below was run against Quint 0.32.0 and Clojure 1.12.5.
+command below was run against Quint 0.32.0 and Clojure 1.12.5. Quint 0.33.0 is
+now the minimum ([why](decisions/0014-quint-floor.md)), and
+[`examples/counter/`](../examples/counter/) — §1–§5 as a project — runs green on
+it.
 
 §1–§5 exist as a project you can run instead of retype:
 [`examples/counter/`](../examples/counter/) is this same spec and the same
@@ -279,6 +282,12 @@ The driver says where to read them, and `qt/check-run` names the run:
   (qt/check-run counter {:test "addThenTakeTest"}))
 ```
 
+A run is identified by its name, not a seed: a divergence reads `diverged on
+run "addThenTakeTest"` and is saved as `counter-addThenTakeTest.itf.json`, so
+running it again rewrites one file. Pass `:seed` only for a run with `nondet`
+in it — and note that Quint then tries it once, where without a seed it tries
+up to 10000 times.
+
 `lastAction` and `lastPick` are **not** compared against your application —
 each path's root variable leaves the state, because tracking the action is the
 spec's own bookkeeping and your code should know nothing about it. If you
@@ -334,6 +343,60 @@ Two things to know before you reach for it:
   run on every save — this repository uses `^:slow` and a `bb test:verify`
   task.
 
+### Temporal properties, and TLC — the spec only
+
+Everything else in this guide tests your code. This does not: under TLC no
+trace comes back, so a temporal property is checked against the spec and your
+implementation is never run. It is here so that the spec's own properties can
+sit in the same test suite; `quint verify` answers the same question without
+this library.
+
+`:temporal` names a `temporal` definition instead of an invariant — including
+Quint 0.33.0's action properties, which are about what a step may do rather
+than what a state may be. Refusing should change nothing:
+
+```
+  temporal refusingChangesNothing =
+    always((next(lastOp) == "refused" implies next(count) == count).orKeep(count))
+```
+
+```clojure
+(qt/verify counter {:temporal "refusingChangesNothing" :backend :tlc})
+```
+
+It needs `:backend :tlc`, and is refused without it: under Apalache, Quint
+first asks on stdin whether to go ahead, and unanswered it either waits for
+ever or, with stdin closed, exits 0 having checked nothing. It is also refused
+alongside `:invariant`, because Quint gives one verdict for the two.
+
+TLC changes three things. It writes no trace, so a violated property is a
+`:quint-failed` quoting Quint's `found a counterexample`, with nothing to
+replay. It ignores `:max-steps` and explores every reachable state, so the
+state space has to be finite — and this counter's is not, since `add` has no
+ceiling. With `count + n <= 20` added to `add`, the property above holds, and
+`always((next(count) >= count).orKeep(count))` is found violated, as `take`
+says it should be. And TLC is the only checker that accepts a Choreo spec at
+all; see [choreo.md](choreo.md).
+
+## 9. A spec written with Choreo
+
+[Choreo](https://github.com/informalsystems/choreo) specs keep all of their
+state in one variable, `s`, and name none of their transitions: under `--mbt`
+every step is `"step"`. The spec records each transition in `s.extensions`, and
+the driver says where things are:
+
+```clojure
+(q/defdriver two-phase-commit
+  {:spec        "spec/two_phase_commit.qnt"
+   :scan        '[tpc.core tpc.model-test]
+   :state-path  [:s]                               ; compare s's fields
+   :action-path [:extensions :actionTaken :tag]    ; read inside s
+   :nondet-path [:extensions :actionTaken :value]})
+```
+
+The recipe, step by step, is [choreo.md](choreo.md), and
+[`examples/two-phase-commit/`](../examples/two-phase-commit/) runs it.
+
 ## The whole vocabulary
 
 Six keys, qualified by `quint`, requiring nothing. The first five are the ones
@@ -372,6 +435,8 @@ If `quint` collides with something, a driver can move all six at once with
                                               ; model checker for verify
    :action-path [:lastAction]                 ; for traces with no mbt:: — see §7
    :nondet-path [:lastPick]
+   :state-path  [:s]                          ; one record holding all the state,
+                                              ; as Choreo's does — see §9
    :key-fn  (fn [full-name] ...)})            ; variable name -> keyword
 ```
 
@@ -385,6 +450,15 @@ If `quint` collides with something, a driver can move all six at once with
 recorded failure a deterministic regression test — see §6.
 
 ## Rough edges, honestly
+
+- **Only one direction is checked.** Replay drives the application through
+  steps the spec *took*, and compares what it sees. It never asks the
+  application to take a step the spec *forbids*, so an application that allows
+  more than the spec does passes. Recorded on the two-phase commit: a
+  participant that aborts on its own after voting yes — a real safety bug —
+  passes `check` with 500 attempts on every seed tried, because no trace ever
+  asks a prepared participant to abort. Catching that needs a different kind of
+  test; see [techdebt.md](techdebt.md), "Refusal checks".
 
 - **0.6.1 is an early release.** The API is the one described here and is not
   expected to move, but nothing has been used in anger by anyone but its

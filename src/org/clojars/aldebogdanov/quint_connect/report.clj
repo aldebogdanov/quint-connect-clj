@@ -11,14 +11,22 @@
 (defn- headline
   "What went wrong, in one line. A `verify` result leads with the invariant,
   because a violated invariant is the finding even when the implementation
-  matches the counterexample step for step."
-  [{:keys [seed traces failure invariant]}]
-  (if invariant
+  matches the counterexample step for step. A `check-run` result names the run:
+  it is one trace, and it has a seed only if one was passed."
+  [{:keys [seed traces failure invariant] run :test}]
+  (cond
+    invariant
     (str "invariant " (pr-str (:name invariant)) " does not hold"
          (if failure
            ", and the implementation does not match the counterexample"
            (str "; the implementation reproduces it faithfully, so the spec"
                 " is where to look")))
+
+    run
+    (str "spec and implementation diverged on run " (pr-str run)
+         (when seed (str ", seed " seed)))
+
+    :else
     (str "spec and implementation diverged on trace " (:trace failure)
          " of " traces ", seed " seed)))
 

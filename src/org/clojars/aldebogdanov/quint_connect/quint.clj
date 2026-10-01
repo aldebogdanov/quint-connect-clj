@@ -11,7 +11,14 @@
 (def tested-version
   "The Quint the fixtures were recorded from and the behaviour in
   docs/notes/itf-format.md was verified against."
-  "0.32.0")
+  "0.33.0")
+
+(def minimum-version
+  "The oldest Quint whose `--mbt` traces can be trusted. Before 0.33.0 the rust
+  evaluator could write a dead-ended sample's action and picks onto state 0 of
+  the next trace (Quint #2012), and replay dispatches state 0 by that label.
+  See docs/decisions/0014-quint-floor.md."
+  "0.33.0")
 
 (defn- fail [error msg data]
   (throw (ex-info msg (assoc data :quint/error error))))
@@ -42,9 +49,30 @@
       (fail :quint-failed "quint --version failed" {:exit exit :stderr err}))
     (str/trim out)))
 
+(defn- release
+  "A version string as three numbers, for ordering. Anything after them — a
+  pre-release suffix — is ignored."
+  [v]
+  (vec (take 3 (concat (map parse-long (re-seq #"\d+" v)) (repeat 0)))))
+
+(defn- floor!
+  "The version, if it is not older than `minimum-version`. Throws
+  `:quint-too-old` if it is: an older Quint does not fail, it writes traces
+  that replay wrongly, so warning is not enough."
+  [v]
+  (when (neg? (compare (release v) (release minimum-version)))
+    (fail :quint-too-old
+          (str "quint " v " is older than " minimum-version ", the oldest whose"
+               " --mbt traces can be trusted: before it, the rust evaluator could"
+               " label state 0 with a previous sample's action and picks. Upgrade"
+               " with npm i -g @informalsystems/quint@" tested-version
+               ". Replaying committed traces needs no Quint at all.")
+          {:version v :minimum minimum-version}))
+  v)
+
 (def ^:private checked-version
   (delay
-   (let [v (version)]
+   (let [v (floor! (version))]
      (when-not (= tested-version v)
        (.println System/err
                  (str "quint-connect: found quint " v ", developed against "
@@ -131,13 +159,14 @@
   "`quint verify` takes the spec by absolute path, because unlike `run` and
   `test` it is invoked from the scratch directory rather than the spec's own.
   See `in-scratch!` for why."
-  [{:keys [spec main invariant init-action step-action max-steps backend]} out-dir]
+  [{:keys [spec main invariant temporal init-action step-action max-steps backend]} out-dir]
   (cond-> ["verify" (.getAbsolutePath (io/file spec))
            (str "--out-itf=" out-dir "/verify.itf.json")
            "--verbosity=0"]
     main        (conj (str "--main=" main))
     backend     (conj (str "--backend=" (name backend)))
     invariant   (conj (str "--invariant=" invariant))
+    temporal    (conj (str "--temporal=" temporal))
     init-action (conj (str "--init=" init-action))
     step-action (conj (str "--step=" step-action))
     max-steps   (conj (str "--max-steps=" max-steps))))
@@ -251,11 +280,14 @@
     {:seed seed :dir dir :cmd cmd :traces traces}))
 
 (defn verify!
-  "Check an invariant with `quint verify`, which runs Apalache.
+  "Check an invariant or a temporal property with `quint verify`, which runs
+  Apalache, or TLC.
 
-  Takes `:spec` and `:invariant` (both required), plus the optional `:main`,
-  `:init-action`, `:step-action`, `:max-steps` and `:backend` — which selects
-  the *model checker* here (`:apalache` or `:tlc`), not the evaluator. Returns
+  Takes `:spec` and one of `:invariant` or `:temporal` — the name of a `val`,
+  or of a `temporal` definition such as an action property — plus the optional
+  `:main`, `:init-action`, `:step-action`, `:max-steps` and `:backend`, which
+  selects the *model checker* here (`:apalache` or `:tlc`), not the evaluator.
+  Returns
 
     {:holds? true  :cmd [\"quint\" ...] :dir \"/path/to/spec\" :traces []}
     {:holds? false :cmd [\"quint\" ...] :dir \"/path/to/spec\"
@@ -275,15 +307,44 @@
   with the scratch directory. Apalache is downloaded on first use and a run can
   take minutes.
 
-  Throws `ex-info` with `:quint/error` `:quint-not-found`, or `:quint-failed`
-  when quint exited non-zero without writing a counterexample — carrying
-  Quint's own stderr, which is where the reason is."
-  [{:keys [spec invariant] :as opts}]
+  With `:backend :tlc`, a violated property writes no trace either: Quint
+  writes `--out-itf` only from Apalache. So under TLC that outcome is also
+  `:quint-failed`, with a message that says so and quotes Quint's first line —
+  there is no counterexample to replay, and the verdict is in that line. TLC
+  also ignores `:max-steps` and explores every reachable state, so a spec whose
+  state space has no end never finishes under it.
+
+  `:temporal` needs `:backend :tlc`. Under Apalache, Quint first asks on stdin
+  whether to go ahead, its temporal support being experimental; left open it
+  waits for ever, and closed it exits 0 having checked nothing — a pass. And it
+  cannot be combined with `:invariant`: Quint gives one verdict for the two,
+  which could not say which was violated. Both recorded with
+  dev/probes/temporal_probe.sh.
+
+  Throws `ex-info` with `:quint/error` `:bad-options` for either misuse above,
+  before Quint runs; `:quint-not-found`; or `:quint-failed` when there is
+  nothing to check, or quint exited non-zero without writing a counterexample
+  — carrying Quint's own stderr, which is where the reason is."
+  [{:keys [spec invariant temporal backend] :as opts}]
   (when-not spec
     (fail :quint-failed "no :spec in the driver" {:opts opts}))
-  (when-not invariant
-    (fail :quint-failed "no :invariant to check; name a val from the spec"
+  (when-not (or invariant temporal)
+    (fail :quint-failed
+          "no :invariant or :temporal to check; name a val or a temporal definition from the spec"
           {:opts opts}))
+  (when (and invariant temporal)
+    (fail :bad-options
+          (str "verify checks :invariant or :temporal, not both: Quint gives one"
+               " verdict for the two, so a violation could not say which it was."
+               " Verify them in two calls.")
+          {:invariant invariant :temporal temporal}))
+  (when (and temporal (not= "tlc" (some-> backend name)))
+    (fail :bad-options
+          (str ":temporal needs :backend :tlc. Under Apalache, the default, Quint"
+               " first asks on stdin whether to go ahead, its temporal support"
+               " being experimental: left unanswered it waits for ever, and with"
+               " stdin closed it exits 0 having checked nothing.")
+          {:temporal temporal :backend backend}))
   @checked-version
   (let [{:keys [exit out err cmd dir traces]}
         (in-scratch! {:spec spec :run-in :scratch} #(verify-args opts %))]
@@ -291,9 +352,17 @@
       (zero? exit) {:holds? true  :cmd cmd :dir dir :traces []}
       (seq traces) {:holds? false :cmd cmd :dir dir :traces traces}
       :else        (fail :quint-failed
-                         (str "quint verify exited " exit " and wrote no"
-                              " counterexample, so the invariant was never"
-                              " checked; the spec or the invariant name is the"
-                              " likely cause")
-                         {:cmd cmd :dir dir :invariant invariant :exit exit
+                         (if (= "tlc" (some-> backend name))
+                           (str "quint verify --backend=tlc exited " exit
+                                " and wrote no trace. Under TLC a violated"
+                                " property looks the same, because Quint writes"
+                                " --out-itf only from Apalache: there is nothing"
+                                " to replay. Quint said: "
+                                (some #(when-not (str/blank? %) (str/trim %))
+                                      (str/split-lines (str out err))))
+                           (str "quint verify exited " exit " and wrote no"
+                                " counterexample, so the invariant was never"
+                                " checked; the spec or the invariant name is the"
+                                " likely cause"))
+                         {:cmd cmd :dir dir :invariant invariant :temporal temporal :exit exit
                           :stderr err :stdout out}))))

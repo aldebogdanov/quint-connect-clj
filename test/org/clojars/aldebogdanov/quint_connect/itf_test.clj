@@ -138,6 +138,107 @@
            (error-of #(trace "tracked_test_depositThenOverdraftTest.itf.json"
                              (assoc tracked :nondet-path [:lastError])))))))
 
+;; --- a Choreo spec: all state in one record --------------------------------
+
+(def ^:private choreo {:state-path  [:s]
+                       :action-path [:extensions :actionTaken :tag]
+                       :nondet-path [:extensions :actionTaken :value]})
+
+(defn- message [f]
+  (try (f) nil (catch clojure.lang.ExceptionInfo e (ex-message e))))
+
+(deftest a-state-path-makes-the-fields-of-a-record-the-variables
+  (let [t (trace "choreo/tpc_run_0.itf.json" {:state-path [:s]})
+        [s0 s1] (:states t)]
+    (is (= [:events :extensions :messages :system] (:vars t)))
+    (is (= {:process_id "p1"
+            :role       {:tag "Participant" :value []}
+            :stage      {:tag "Working" :value []}}
+           (get-in s0 [:state :system "p1"])))
+    (is (= #{} (get-in s0 [:state :messages "c"])))
+    (is (= [] (get-in s0 [:state :extensions])) "Choreo as written: extensions is ()")
+
+    (testing "mbt:: is untouched by it: every step is \"step\", with a node and an outcome"
+      (is (= "step" (:action s1)))
+      (is (= "c" (get-in s1 [:picks :v])))
+      (is (= {:process_id "c"
+              :role       {:tag "Coordinator" :value []}
+              :stage      {:tag "Aborted" :value []}}
+             (get-in s1 [:picks :transition :post_state]))))))
+
+(deftest a-recorded-transition-drives-a-trace-with-no-mbt
+  (let [t (trace "choreo/tpc_tracked_test_commitTest.itf.json" choreo)]
+    (is (= [:events :messages :system] (:vars t))
+        "the recording is bookkeeping, and leaves the compared state")
+    (is (= ["Init" "SpontaneouslyPrepares" "SpontaneouslyPrepares"
+            "SpontaneouslyPrepares" "DecidesOnCommit" "CommitsAsInstructed"
+            "CommitsAsInstructed" "CommitsAsInstructed"]
+           (map :action (:states t))))
+    (is (= {:node "c"} (get-in t [:states 4 :picks])))
+    (is (= {:tag "Committed" :value []} (get-in t [:states 4 :state :system "c" :stage])))
+
+    (testing "Init carries the empty tuple, which is no picks"
+      (is (= {} (get-in t [:states 0 :picks]))))))
+
+(deftest a-recorded-transition-and-mbt-agree
+  (let [name "choreo/tpc_tracked_run_0.itf.json"
+        m    (rest (:states (trace name {:state-path [:s]})))
+        p    (rest (:states (trace name choreo)))]
+    (is (every? #{"step"} (map :action m)))
+    (is (= (map #(get-in % [:picks :v]) m) (map #(get-in % [:picks :node]) p))
+        "the node mbt:: picked is the node the spec recorded")
+    (is (= (map #(get-in % [:picks :transition :post_state]) m)
+           (map #(get-in % [:state :system (get-in % [:picks :node])]) p))
+        "and the outcome mbt:: picked is the state the recorded node ended in")))
+
+(deftest a-state-path-that-leads-nowhere-is-typed
+  (testing "a bare keyword instead of a vector"
+    (is (= :bad-decode-path
+           (error-of #(trace "choreo/tpc_run_0.itf.json" {:state-path :s})))))
+
+  (testing "a variable that is not there, with the ones that are"
+    (let [m (message #(trace "choreo/tpc_run_0.itf.json" {:state-path [:state]}))]
+      (is (str/includes? m ":state-path [:state] found nothing in state 0"))
+      (is (str/includes? m ":s"))))
+
+  (testing "something that is not a record"
+    (is (= :bad-decode-path
+           (error-of #(trace "choreo/tpc_run_0.itf.json"
+                             {:state-path [:s :extensions]}))))))
+
+(deftest paths-that-leave-nothing-to-compare-are-refused
+  ;; Without :state-path the action is read correctly and then s -- all of the
+  ;; state -- leaves the comparison as the path's root. Every step would pass.
+  (let [opts {:action-path [:s :extensions :actionTaken :tag]
+              :nondet-path [:s :extensions :actionTaken :value]}
+        f    #(trace "choreo/tpc_tracked_test_commitTest.itf.json" opts)]
+    (is (= :bad-decode-path (error-of f)))
+    (is (str/includes? (message f) ":state-path [:s]"))
+
+    (testing "and with :action-path alone, where handlers that need no picks
+              used to replay every step green"
+      (let [g #(trace "choreo/tpc_tracked_test_commitTest.itf.json"
+                      (select-keys opts [:action-path]))]
+        (is (= :bad-decode-path (error-of g)))
+        (is (str/includes? (message g) ":action-path starts at :s"))))))
+
+(deftest quint-0-32-labels-state-0-of-choreo-as-written-with-step
+  ;; Why Quint 0.33.0 is the floor (decisions/0014). Recorded on 0.32.0, whose
+  ;; rust evaluator left a dead-ended sample's action and picks in storage,
+  ;; where the next sample's init could not overwrite them (Quint #2012). Replay
+  ;; dispatches state 0 by that label. 0.33.0 writes "init" in both traces.
+  (let [[t0 t1] (map #(first (:states (trace % {:state-path [:s]})))
+                     ["choreo/tpc_mislabel_0.itf.json" "choreo/tpc_mislabel_1.itf.json"])]
+    (is (= ["step" {:v "p1"}] [(:action t0) (:picks t0)])
+        "no transition: the None was dropped, as None is")
+    (is (= ["init" {}] [(:action t1) (:picks t1)]) "same run, next trace")
+    (is (= (:state t0) (:state t1)) "and both are the initial state")))
+
+(deftest picks-that-are-neither-a-record-nor-empty-are-refused
+  (is (= :bad-decode-path
+         (error-of #(trace "choreo/tpc_tracked_test_commitTest.itf.json"
+                           (assoc choreo :nondet-path [:extensions :actionTaken :tag]))))))
+
 (deftest meta-noise-is-dropped
   (let [raw (fixture "bank_run_0.itf.json")
         t   (trace "bank_run_0.itf.json")

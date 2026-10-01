@@ -24,7 +24,7 @@
   "The driver keys the decoder understands. Everything else in the driver map
   is none of its business."
   [driver]
-  (select-keys driver [:key-fn :action-path :nondet-path]))
+  (select-keys driver [:key-fn :state-path :action-path :nondet-path]))
 
 (defn- opts!
   "Options are Quint's knobs and nothing else. `:actions` and `:state` shape the
@@ -86,7 +86,8 @@
 
   Takes a resolved driver and an options map merged over it; `:test` names a
   `run` in the spec and is required. Returns what `check` returns, with
-  `:traces` 1.
+  `:traces` 1 and `:test`, the run's name — which is what identifies the
+  trace, since a seed is only there if one was passed.
 
   `quint test` emits no `mbt::` variables, so the spec must record the action
   it took in an ordinary variable and the driver must say where with
@@ -97,11 +98,13 @@
   A scripted run is a scenario a human wrote down: use it for the case that
   must keep working, and `check` for the cases nobody thought of."
   [driver opts]
-  (replay-all driver (quint/test! (merge driver (opts! opts)))))
+  (let [o (merge driver (opts! opts))]
+    (assoc (replay-all driver (quint/test! o)) :test (:test o))))
 
 (defn verify
-  "Check an invariant with Apalache, and replay the counterexample if there is
-  one.
+  "Check a property of the spec — an invariant, or with `:temporal` a temporal
+  one — and replay the counterexample against the implementation when Quint
+  writes one, which it does only from Apalache.
 
   Takes a resolved driver and an options map merged over it; `:invariant` names
   a `val` in the spec and is required. `:max-steps` bounds the search. Returns
@@ -127,6 +130,13 @@
   `:action-path` a scripted run needs; without it replay throws
   `:unknown-action`.
 
+  `:temporal` names a `temporal` definition instead — an action property, say
+  — and needs `:backend :tlc`. It checks the spec only: the implementation is
+  never run. One that holds returns `:ok? true` with
+  `:temporal {:name \"commitIsFinal\" :holds? true}`. One that does not is the
+  `:quint-failed` `quint/verify!` throws: TLC writes no counterexample, so
+  there is nothing to replay and no result to build around it.
+
   Throws whatever `quint/verify!` and `replay/run-trace` throw."
   [driver opts]
   (let [o (merge driver (opts! opts))
@@ -134,7 +144,8 @@
         base {:seed nil :cmd cmd :dir dir}]
     (if holds?
       (assoc base :ok? true :traces 0 :steps 0
-             :invariant {:name (:invariant o) :holds? true}
+             (if (:temporal o) :temporal :invariant)
+             {:name (or (:temporal o) (:invariant o)) :holds? true}
              :coverage (coverage driver {})
              :failure nil)
       (let [{:keys [name json]} (first traces)

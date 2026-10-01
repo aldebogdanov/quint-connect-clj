@@ -91,8 +91,10 @@ These are the ones people trip on. The full set is in
   Never a classpath-wide scan, never a global registry atom.
 - **The application must not be reshaped for the tool.** An annotated function
   keeps the signature it would have had anyway.
-- A namespace approaching ~200 lines is a signal to stop and discuss, not to
-  split reflexively.
+- ~200 lines per namespace is a recommendation, not a limit: approaching it
+  means looking for a seam. Split where there is one; where there is none,
+  [docs/architecture.md](docs/architecture.md) §3 records why. Never split
+  reflexively.
 - Prefer duplication over an abstraction used once.
 
 ## The annotation vocabulary is closed

@@ -241,55 +241,173 @@ turn comes; none is committed to now.
   information, and dropping steps from a state machine trace produces traces the
   spec never generated.
 - `witnesses` / `--invariants` support for targeted trace generation.
+- **Refusal checks: the other direction.** Moved to
+  [techdebt.md](techdebt.md), status *maybe*.
+- **TLC counterexamples.** Blocked on Quint writing them;
+  [upstream/quint-tlc-itf.md](upstream/quint-tlc-itf.md) is the proposal.
 
-- **Choreo support, end to end.** A later release, and the biggest single thing
-  missing. [Choreo](https://github.com/informalsystems/choreo/) is where the
-  Quint ecosystem is pointed. **Recorded on 2026-08-26** by running Choreo's own
-  `two_phase_commit.qnt` under `--mbt`, replacing what this entry used to infer:
+- **Choreo support** left this list: it is M9, below.
 
-  ```
-  vars: ["two_phase_commit::choreo::s", "mbt::actionTaken", "mbt::nondetPicks"]
+---
 
-  index 1  actionTaken: "step"
-           picks: {v: Some("p3"),
-                   transition: Some({post_state: {process_id: "p3",
-                                                  role: Participant,
-                                                  stage: Aborted},
-                                     effects: Set()})}
-  ```
+## M9 — Choreo, end to end (done)
 
-  Three things follow, and only the first was guessed right before.
+[Choreo](https://github.com/informalsystems/choreo/) is where the Quint
+ecosystem is pointed, and it was the biggest single thing missing.
 
-  1. `mbt::actionTaken` is `"step"` on **every** step. One name, so nothing
-     dispatches on it. (The earlier guess said `process_transitions`; it is the
-     outer action, not the inner one.)
-  2. The picks are richer than expected: they carry the acting process **and**
-     the whole chosen transition. But a transition is `{post_state, effects}` —
-     an outcome, with no name anywhere in it.
-  3. All state is one variable, `s`, holding `{events, extensions, messages,
-     system}`, with `system` a map of process to local state.
+### What was recorded before, on 2026-08-26
 
-  So a Choreo spec **can** drive an implementation, and not the way this entry
-  assumed. Since every step is `"step"`, one driver-map entry catches all of
-  them and receives both picks:
+Choreo's own `two_phase_commit.qnt`, run under `--mbt`:
 
-  ```clojure
-  :actions {"step" (fn [{:keys [v transition]}] ...)}   ; node, and its post-state
-  ```
+```
+vars: ["two_phase_commit::choreo::s", "mbt::actionTaken", "mbt::nondetPicks"]
 
-  and the mapping from an outcome back to the operation that produces it is
-  adaptation in the test namespace, which is where this design already says
-  adaptation belongs. State comes back through one reader supplying `:s`.
+index 1  actionTaken: "step"
+         picks: {v: Some("p3"),
+                 transition: Some({post_state: {process_id: "p3",
+                                                role: Participant,
+                                                stage: Aborted},
+                                   effects: Set()})}
+```
 
-  What this does **not** reach is dispatch by transition *name*, because Choreo
-  records none. The instrumentation Quint's docs mention would put a name in
-  the local state — and `:action-path` could not read it there anyway, because
-  it is a static `get-in` path and the node that acted is a *pick*, different on
-  every step. Letting `:action-path` and `:nondet-path` take a function of the
-  decoded state and picks, not only a vector, is the change that would close
-  that. Noted, not committed to.
+1. `mbt::actionTaken` is `"step"` on **every** step. One name, so nothing
+   dispatches on it.
+2. The picks carry the acting process and the whole chosen transition — but a
+   transition is `{post_state, effects}`, an outcome with no name in it.
+3. All state is one variable, `s`, holding `{events, extensions, messages,
+   system}`, with `system` a map of process to local state.
 
-  What is genuinely left is the example: a Clojure two-phase commit and the
-  adapter above, green. It needs Choreo's four `.qnt` files vendored — 30 KB,
-  Apache-2.0, so attribution rather than a licence problem — and vendoring is a
-  dependency decision that wants its own ADR under the rule in CLAUDE.md.
+So a Choreo spec as written can drive an implementation through one driver-map
+`:actions {"step" ...}` entry that maps an outcome back to an operation. That
+reaches `check` and nothing else: `quint test` and `quint verify` emit no picks
+at all, and coverage can only ever say `"step"`.
+
+### What was recorded for this milestone, on 2026-09-30
+
+- **The ecosystem already has an answer, and it is not a name in the local
+  state.** quint-connect (Rust) tests its own two-phase commit by
+  instrumenting the spec: every transition emits a
+  `CustomEffect(RecordAction(DecidesOnCommit({ node: ... })))`, and the effect
+  processor writes it into `s.extensions.actionTaken`. Quint's own blog
+  describes Choreo testing the same way. A variant's tag is the action name
+  and its record is the picks.
+- Because that record lives in `s`, it is in **every** trace: `quint run
+  --mbt` and `quint test` alike. Recorded both; `commitTest` comes out of
+  `quint test` naming each transition with no `mbt::` anywhere.
+- `Init` carries the empty tuple, `{"tag": "Init", "value": {"#tup": []}}`,
+  which decodes to `[]` — not a record of picks.
+- Recording an action as an effect means no transition is ever empty, so
+  Choreo's filter stops dropping no-op transitions. A recorded seed-42 trace
+  spent four of its eight steps on `AbortsAsInstructed` for participants that
+  had already aborted. (Fixed after review: the spec now filters them itself —
+  see below.)
+- **`quint verify` fails on every Choreo spec**, instrumented or not, on Quint
+  0.32.0 and on 0.33.0 (released 2026-09-28): `internal error in type
+  checking: A typed declaration two_phase_commit::choreo::s was transformed to
+  an untyped expression`. Choreo's own Tendermint fails the same way. The
+  message is Apalache's — its type watchdog, `TypeWatchdogTransformationListener`
+  in `apalache.jar`, rejecting what Quint hands it — under Apalache 0.56.1 and
+  0.62.1, while `quint compile --target=tlaplus` of the same spec succeeds.
+  Whose bug it is was not established. What it means here is that there is no
+  Choreo counterexample to record. `q/verify` surfaces the failure as
+  `:quint-failed` with that stderr verbatim, which is the right behaviour and
+  all this library can do. Reproducible with [`dev/probes/choreo_probe.sh`](../dev/probes/choreo_probe.sh).
+  *After review:* reduced to thirteen lines — a state variable whose type has
+  a type parameter fixed only by instantiation — present from Quint 0.28.0 on;
+  and `--backend=tlc` checks Choreo specs, without writing a trace.
+- Imports resolve relative to the importing file, so vendored Choreo works
+  from any directory layout that keeps `choreo.qnt` beside its `spells/`.
+
+### The plan
+
+The current library already replays the instrumented convention, except for
+two things, and one of them is silent.
+
+`:action-path [:s :extensions :actionTaken :tag]` does read the action. But a
+path's root variable leaves the compared state, and in a Choreo spec the root
+is `s` — which is all of the state. What is left to compare is nothing, and
+**every step passes**: through driver-map handlers that do nothing, the
+recorded `commitTest` replays green. That is the failure mode this design is
+most exposed to, reached by writing the paths the obvious way.
+
+Library changes, in `itf` only, with `core` passing one more key through:
+
+- **`:state-path`**, a vector in the driver map. The compared state is the
+  record found there, and its fields stand in for spec variables from then on:
+  `{:state-path [:s]}` compares `:system`, `:messages`, `:events` and
+  `:extensions`, and a reader annotated `{:quint/state :system}` supplies one of
+  them. It is applied first; `:action-path` and `:nondet-path` are read inside
+  it, and each root still leaves the compared state, so
+  `[:extensions :actionTaken :tag]` removes exactly the bookkeeping.
+  `:bad-decode-path` when it is not a vector, finds nothing, or finds something
+  that is not a record.
+- **The empty tuple is no picks.** `:nondet-path` accepts `[]`, Quint's
+  encoding of a variant without an argument, as `{}`. Anything else that is
+  not a record is still refused.
+- **Paths that swallow the whole state are an error.** If removing the roots
+  of `:action-path` and `:nondet-path` leaves nothing to compare, decoding
+  fails with `:bad-decode-path`, naming `:state-path` as the likely fix.
+
+No new public function. `itf/itf->trace` keeps its signature and gains an
+option; `core/driver` passes `:state-path` through with the others.
+
+Around it:
+
+- **Vendored Choreo**: `choreo.qnt` and `spells/basicSpells.qnt` at commit
+  `000cf4e`, with Choreo's Apache-2.0 licence beside them. A dependency
+  decision, so [0012](decisions/0012-vendor-choreo.md); the decoding choices
+  are [0013](decisions/0013-choreo-state-path.md).
+- **Fixtures** in `dev/fixtures/choreo/`: Choreo's `two_phase_commit.qnt`
+  (import paths adjusted, nothing else) recorded under `--mbt`, and
+  `two_phase_commit_tracked.qnt` — the same, instrumented — recorded under
+  `--mbt` and under `quint test`.
+- **`dev/tpc/core.clj`**, a small annotated two-phase commit, replayed against
+  all three recordings by `bb test`: the instrumented ones through
+  annotations, Choreo's own through a `"step"` adapter.
+- **`examples/two-phase-commit/`**, self-contained like the other four:
+  `check`, `check-run` of `commitTest`, and a broken participant that ignores
+  an abort once it has voted.
+- **[docs/choreo.md](choreo.md)**: the recipe, written to be followed step by
+  step by a person or an agent.
+
+**Done when:** `bb test` replays a recorded trace of each route against a
+Clojure two-phase commit with no Quint installed; the example is green under
+`check` and `check-run` against the working tree; its broken participant fails
+naming the transition, the node and the diverging stage; and a driver that
+forgets `:state-path` fails at decoding instead of passing.
+
+— Done. `choreo_test.clj` replays all four recordings with no Quint, and
+generates through both routes under `bb test:all`. The example's broken
+participant fails with `in spec {:system {"p3" {:stage {:tag "Aborted"}}}}`
+against `in app … "Prepared"`, naming `#'tpc.core/handle-abort!`.
+
+### Where it departed from the plan
+
+- **Found while generating, not planned: state 0 can say `"step"`.** Quint
+  0.32.0's default rust evaluator, writing more than one trace of Choreo's own
+  spec, labels most initial states `"step"`, with the picks of an attempt that
+  was never taken. Replay trusts the label, and the as-written route handles
+  `"step"`, so its adapter was handed the initial state before `init` ran.
+  First handled with `:backend :typescript`; then found in Quint's own
+  changelog as a bug fixed in 0.33.0 (#2012), which is now the floor —
+  [0014](decisions/0014-quint-floor.md). Replay still trusts the trace.
+  Recorded as `tpc_mislabel_0/1.itf.json`.
+- **Found after review: the repeats were the spec's to remove.** They were
+  first documented as something the implementation must tolerate. They are a
+  change to the protocol's traces that Choreo itself prevents, and a one-line
+  filter in the instrumented spec, `changes_something`, prevents them again.
+  With it, a run ends when the protocol does, which is also what makes
+  `:max-samples` useful: Quint writes the longest of its attempts, and 500
+  attempts for 50 traces put ten commits among them instead of one.
+- **`:temporal` for `verify`, after review.** TLC is the one checker that
+  accepts a Choreo spec, and Quint 0.33.0's action properties are checked with
+  it, so `verify` takes `:temporal` — under `:backend :tlc` only, because under
+  Apalache Quint asks on stdin first and, unanswered, exits 0 having checked
+  nothing. Recorded with `dev/probes/temporal_probe.sh`.
+- **No committed trace in the example.** The other four examples generate
+  rather than replay, and the example says so; `replay-file` on Choreo traces
+  is covered by the library's own tests.
+- **`itf` reached 339 lines**, and after review was split: `itf.paths` now
+  reads a decoded state through the three paths, and the ~200-line rule became
+  a recommendation with reasons recorded. See [architecture.md](architecture.md)
+  §3.

@@ -1,8 +1,12 @@
 # Fixtures
 
-Recorded output of Quint 0.32.0, used as test data. Regenerate with
-`bb fixtures` (only rewrites the `bank_run_*` files; the others are produced by
-the commands in [../../docs/notes/itf-format.md](../../docs/notes/itf-format.md)).
+Recorded output of Quint 0.32.0, used as test data. Every one was re-recorded
+on 0.33.0 on 2026-09-30 and came out identical but for `#meta` timestamps,
+except `choreo/tpc_mislabel_0.itf.json`, which records the bug 0.33.0 fixed —
+see [0014](../../docs/decisions/0014-quint-floor.md). Regenerate with
+`bb fixtures` (rewrites the recordings made with a fixed seed or a named test,
+`choreo/` included; the others are produced by the commands in
+[../../docs/notes/itf-format.md](../../docs/notes/itf-format.md)).
 
 | file                                        | what it is                                               |
 | ------------------------------------------- | -------------------------------------------------------- |
@@ -17,6 +21,7 @@ the commands in [../../docs/notes/itf-format.md](../../docs/notes/itf-format.md)
 | `bigint_typescript_0.itf.json`              | the same spec, encoded correctly by the typescript backend |
 | `anonymous.qnt`, `anonymous_0.itf.json`     | a step with one branch that has no named action in it, so `mbt::actionTaken` is `""` — the case a driver cannot dispatch |
 | `collide.qnt`, `collide_0.itf.json`         | one module instantiated twice, so two variables end in `::n` — decodes only with a `:key-fn` |
+| `choreo/`                                   | vendored [Choreo](https://github.com/informalsystems/choreo) (Apache-2.0), its two-phase commit as written and instrumented, and three recordings of them — see [choreo/README.md](choreo/README.md) |
 
 The `#meta.timestamp` and `#meta.description` fields differ on every
 regeneration. Decoding must ignore them.

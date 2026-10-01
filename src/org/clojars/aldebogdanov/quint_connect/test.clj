@@ -30,13 +30,19 @@
   when it does, they are the same trace. Naming it after the invariant rather
   than after a seed is the honest name: Apalache did not roll dice, so there is
   no seed to reproduce it with, and re-checking the same invariant should
-  rewrite the same file."
-  [{:keys [seed cmd failure invariant]}]
+  rewrite the same file. A scripted run is named after the run, for the same
+  reason: it is identified by its name, and has a seed only if one was passed."
+  [{:keys [seed cmd failure invariant] run :test}]
   (cond
     (:trace-json invariant)
     {:json (:trace-json invariant)
      :name (str (spec-name cmd) "-" (:name invariant) "-counterexample.itf.json")
      :at   [:invariant :saved]}
+
+    (and run (:trace-json failure))
+    {:json (:trace-json failure)
+     :name (str (spec-name cmd) "-" run ".itf.json")
+     :at   [:failure :saved]}
 
     (:trace-json failure)
     {:json (:trace-json failure)
@@ -52,7 +58,8 @@
   Takes the result and an options map:
 
     :dir   directory to write into, default `default-failure-dir`
-    :name  file name, default `<spec>-seed<seed>-trace<i>.itf.json`
+    :name  file name, default `<spec>-seed<seed>-trace<i>.itf.json`, or
+           `<spec>-<run>.itf.json` for a `check-run` result
 
   The default name is deterministic on purpose — the same seed and trace index
   is the same spec trace, so re-running a failure rewrites one file instead of

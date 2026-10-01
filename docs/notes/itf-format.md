@@ -1,7 +1,11 @@
 # What Quint actually emits
 
-Observed with **Quint 0.32.0** on 2026-08-13. Everything here was produced by
-running the CLI, not read from documentation. The files in
+Observed with **Quint 0.32.0** on 2026-08-13, and re-checked on **0.33.0** on
+2026-09-30: every fixture re-recorded identically but for `#meta` timestamps,
+except the state-0 bug 0.33.0 fixed, and `verify_probe.sh` reproduced its
+findings on Apalache 0.62.1 with the one change noted below. 0.33.0 is the
+floor; see [../decisions/0014-quint-floor.md](../decisions/0014-quint-floor.md).
+Everything here was produced by running the CLI, not read from documentation. The files in
 [`dev/fixtures/`](../../dev/fixtures/) are the recordings; regenerate with
 `bb fixtures`.
 
@@ -157,9 +161,10 @@ directory and leaves the spec's own alone. That is what lets it be contained:
 run `quint verify` in a scratch directory and it is deleted along with it.
 
 It cannot be renamed. `--apalache-config` with `common.out-dir` is ignored —
-relative or absolute, and `write-intermediate` with it — and a config file
-containing an unknown key still exits 0, so the file is not being validated and
-may not be forwarded at all. The name `_apalache-out` is Apalache's; only the
+relative or absolute, and `write-intermediate` with it. With Apalache 0.56.1
+a config file containing an unknown key still exited 0, so the file was not
+being validated and may not have been forwarded at all; Apalache 0.62.1, which
+Quint 0.33.0 fetches, rejects it. The name `_apalache-out` is Apalache's; only the
 directory it appears in is ours to choose.
 
 Its contents are logs, not results: `_apalache-out/server/<timestamp>/` holding
@@ -205,6 +210,165 @@ running Quint in the spec's own directory does have the effect the comment in
 assumption. If M7b runs
 `verify` from a scratch directory, this is the assumption it rests on.
 
+### `quint verify --temporal`, recorded 2026-09-30 on 0.33.0
+
+Reproducible with [`dev/probes/temporal_probe.sh`](../../dev/probes/temporal_probe.sh),
+on the example from Quint 0.33.0's release announcement: `x` counts from 1 to
+3, `increasing = always((next(x) > x).orKeep(x))` holds and
+`jumps = always((next(x) > x + 1).orKeep(x))` does not.
+
+| backend, and how it is run            | `jumps` (violated)            | trace |
+| ------------------------------------- | ----------------------------- | ----- |
+| Apalache, stdin closed                | **exit 0**, nothing checked   | no    |
+| Apalache, stdin open and unanswered   | waits for ever (killed at 60 s) | no  |
+| TLC                                   | exit 1, `found a counterexample` | no |
+
+**Under Apalache, Quint asks first.** Its temporal support is experimental,
+and `quint verify` prints a warning and then `Do you want to proceed with
+Apalache anyway? (y/N)` on stdin (`askUserYesNo` in `cliCommands.ts`). With
+stdin closed the process exits **0** — which reads as "holds" for a property
+that is violated. Why is inference, not a recording: readline's question is
+never answered, so its callback never runs, and Node exits once its event loop
+is empty, with the default status. Left open, it waits. Neither is a verdict,
+which is why `:temporal` is refused without `:backend :tlc`.
+
+**Under TLC, no trace, and no bound.** `increasing` exits 0, `jumps` exits 1
+with `error: found a counterexample`, and neither writes `--out-itf`. TLC is run
+with `-deadlock` and no depth (`tlc.ts`), so `--max-steps` is ignored: a spec
+whose `n' = n + 1` never stops is still running when the probe kills it.
+
+**One verdict for two kinds of property.** `--invariant=small --temporal=...`
+under TLC exits 1 with the same first line whether the temporal property holds
+or not, so nothing says which one was violated. Hence one or the other per
+call.
+
+## Choreo, recorded 2026-09-30 on 0.32.0
+
+[Choreo](https://github.com/informalsystems/choreo)'s two-phase commit, vendored
+at commit `000cf4e` into [`dev/fixtures/choreo/`](../../dev/fixtures/choreo/),
+as written and instrumented. Everything below is reproducible with
+[`dev/probes/choreo_probe.sh`](../../dev/probes/choreo_probe.sh), and how the
+library uses it is [../choreo.md](../choreo.md).
+
+**One variable.** The whole state is `two_phase_commit::choreo::s`, a record of
+`events`, `extensions`, `messages` and `system`. The last three are
+`#map`s keyed by node id, so they decode with **string** keys. Local states are
+records; roles, stages and messages are sum types, and decode like any other
+variant: `{:tag "Working" :value []}` for one without an argument. `extensions`
+is `()` in Choreo's own spec — `{"#tup": []}`, which decodes to `[]`.
+
+**`--mbt` names nothing.** `mbt::actionTaken` is `"init"` at state 0 and
+`"step"` on every step after it, and `mbt::nondetPicks` is `{v, transition}`:
+the node that acted, and `{post_state, effects}`. Fixture: `tpc_run_0.itf.json`.
+
+**An instrumented spec names every step, in every trace.** When each
+transition records itself into `s.extensions.actionTaken` — the convention
+quint-connect (Rust) uses, and the one `two_phase_commit_tracked.qnt`
+follows — the name is state, so `quint test` writes it as well as
+`quint run`. `Init` carries the empty tuple. Fixtures:
+`tpc_tracked_run_0.itf.json`, `tpc_tracked_test_commitTest.itf.json`.
+
+**Instrumenting changes the traces, unless the spec undoes it.**
+`choreo::step` drops transitions with no effects and an unchanged post-state.
+Recording one gives every transition an effect, so a participant already
+`Aborted` can take `AbortsAsInstructed` again — its `CoordinatorAbort` is never
+removed from its inbox. Without a filter: 74% of the steps in 150 traces of 20
+steps changed neither `system` nor `messages`, and every trace ran to
+`max-steps`. With `changes_something` — Choreo's test with the one record
+counted out, which `two_phase_commit_tracked.qnt` applies in `step` and
+`step_with`: none, and no trace longer than 7 steps. The recorded seed-42 run
+is the unfiltered one with its four repeats taken out, ending at step 4, where
+every node has decided.
+
+**Quint writes the longest traces it tried.** `--max-samples` attempts,
+`--n-traces` written, chosen by the rust evaluator's `compare_by_quality`:
+violations first, then the longest (`evaluator/src/trace_quality.rs`, 0.33.0).
+With repeats filtered out, the longest two-phase commit runs are the commits.
+50 traces from 50 attempts carried one `DecidesOnCommit`, on each of three
+seeds; from 500 attempts, ten or eleven, on each of thirteen, with every
+transition still exercised; from 2000, eleven or twelve, and no
+`SpontaneouslyAborts` at all.
+
+**On 0.32.0, state 0 could say `"step"`.** Quint 0.32.0's default rust
+evaluator, writing more than one trace of Choreo's own spec, labels state 0 of
+most of them `"step"`, with picks `{v: Some("p1"), transition: None}` — an
+attempt that was never taken. The state itself is the initial one. Twenty
+traces at seed 42: 19 say `"step"`. `--backend=typescript`: all 20 say
+`"init"`. It is not Choreo's: a bank whose step is `any { deposit, withdraw }`
+and which runs out of enabled actions does the same, with the label `"step"`
+rather than either inner action.
+
+The cause is Quint's own and is written down in the commit that fixed it for
+0.33.0 (`5b7a850a`, Quint #2012): a sample that ends because `step` found
+nothing enabled leaves the failed attempt's action and picks in storage, and
+recording is first-write-wins, so the next sample's `init` cannot overwrite
+them. Quint 0.33.0 labels every one `"init"`. That is why it is the floor.
+Fixture: `tpc_mislabel_0.itf.json` (`"step"`) and `tpc_mislabel_1.itf.json`
+(`"init"`), the two traces of one 0.32.0 run.
+
+**`quint verify` fails on every Choreo spec**, instrumented or not, with Quint
+0.32.0 / Apalache 0.56.1 and Quint 0.33.0 / Apalache 0.62.1:
+
+```
+error: <unknown>: internal error in type checking: A typed declaration
+two_phase_commit::choreo::s was transformed to an untyped expression
+two_phase_commit::choreo::s
+```
+
+It exits 1 and writes no trace. The message comes from Apalache —
+`TypeWatchdogTransformationListener`, in `apalache.jar` — and Choreo's
+Tendermint fails the same way. The instrumented spec, since its `step` gained a
+filter, fails with a different one: `internal error: while type checking in
+Apalache`.
+
+**What triggers it, reduced.** A state variable whose type has a type
+parameter, fixed only when the module is instantiated. Thirteen lines do it:
+
+```
+module lib {
+  const procs: Set[p]
+  var s: p -> int
+  action init = s' = procs.mapBy(x => 0)
+  action step = { nondet v = oneOf(procs)
+                  s' = s.set(v, 1) }
+}
+module main {
+  import lib(procs = Set("a", "b")) as lib from "./poly"
+  ...
+}
+```
+
+fails `quint verify` with an Apalache type error, and the same module with
+`Set[str]` and `str -> int` written out passes. Choreo's
+`var s: GlobalContext[p, s, m, e, ext]` is exactly that shape, so every Choreo
+spec is exposed. The same reduction fails on Quint 0.28.0, 0.30.0, 0.31.0,
+0.32.0 and 0.33.0: long-standing, not a regression. Nothing in Quint's CHANGELOG or commit
+history names it; its issue tracker could not be searched from where this was
+recorded. Two things ruled out on the way: renaming Choreo's type parameter `s`,
+which shares its name with the variable, and removing the never-assigned
+`var display: d`.
+
+**TLC checks Choreo specs.** `quint verify --backend=tlc` on the instrumented
+two-phase commit exits 0 for `consistency`, which holds, and 1 with `error:
+found a counterexample` for the witness `wit_commit`. It writes no trace
+either way: Quint writes `--out-itf` only on the Apalache path
+(`processApalacheResult` in `cliReporting.ts`; the TLC path in `tlc.ts` reads
+TLC's exit code). So a violated invariant under TLC is a verdict with nothing
+to replay.
+
+Quint 0.33.0's action properties — temporal properties about transitions,
+checked only with TLC — work on the same spec: `always(... implies
+next(stage) == Committed).orKeep(choreo::s)`, "a committed participant stays
+committed", holds with `--temporal`, and one saying the coordinator's stage
+never changes is violated with `error: found a counterexample`. No trace for
+either. This library's `verify` takes them as `:temporal`, under `:backend
+:tlc` only — see §`quint verify --temporal` below.
+
+**Imports resolve relative to the importing file.** `choreo.qnt` imports
+`"spells/basicSpells"` and finds it beside itself wherever it is vendored, and
+`quint typecheck` of a spec by absolute path from an unrelated directory
+succeeds — which is how `verify` runs.
+
 ## Large integers: a real trap
 
 With the **default `--backend=rust`**, integers with absolute value `>= 10^15`
@@ -219,7 +383,7 @@ come out as bignumber.js internals instead of `#bigint`:
 That is `9007199254740993`. The threshold is exact: `999999999999999` encodes
 correctly, `1000000000000000` does not. `--backend=typescript` encodes both
 correctly as `{"#bigint": "..."}`. Fixtures: `bigint_rust_0.itf.json`,
-`bigint_typescript_0.itf.json`.
+`bigint_typescript_0.itf.json`. Still so on 0.33.0: both re-record identically.
 
 **A JavaScript library in a Rust backend is not a contradiction, and the
 attribution above used to imply it was.** What is recorded here is only which

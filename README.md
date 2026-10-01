@@ -5,8 +5,10 @@ specifications.
 
 Status: **0.6.1**. Every planned milestone in
 [docs/roadmap.md](docs/roadmap.md) is done — decoding, replay, the annotation
-registry, the Quint CLI, the public API, failure artifacts, scripted runs and
-`verify`. `bb test` runs a real model-based test end to end, needing no Quint.
+registry, the Quint CLI, the public API, failure artifacts, scripted runs,
+`verify`, and specs written with [Choreo](https://github.com/informalsystems/choreo)
+(unreleased: [docs/choreo.md](docs/choreo.md)). `bb test` runs a real
+model-based test end to end, needing no Quint.
 What is still rough is listed honestly in
 [getting-started](docs/getting-started.md#rough-edges-honestly).
 
@@ -22,6 +24,12 @@ spec.qnt  --quint run --mbt-->  ITF traces  --replay-->  your running app
                                                   |
                                             state diff on divergence
 ```
+
+What that checks is one direction: along every trace, the application does
+what the spec did. It never asks the application to take a step the spec does
+not allow, so an application that *also* does something forbidden — a
+participant that aborts after voting yes — passes. See
+[getting-started](docs/getting-started.md#rough-edges-honestly).
 
 The mapping between spec and code is declared with metadata, next to the code it
 describes. The application never learns that Quint exists: no context argument,
@@ -208,7 +216,7 @@ unless the whole namespace scans empty. See
 
 ## Examples
 
-Four runnable projects, each teaching one thing. Start at the first.
+Five runnable projects, each teaching one thing. Start at the first.
 
 | example | what it shows |
 | ------- | ------------- |
@@ -216,6 +224,7 @@ Four runnable projects, each teaching one thing. Start at the first.
 | [lru/](examples/lru/) | a cache bug that only appears after a particular interleaving — the test nobody writes by hand |
 | [tokens/](examples/tokens/) | `verify`: sampling versus proving, and why a green `verify` does not mean your code is right |
 | [queue/](examples/queue/) | `:quint/driver`: one implementation and one spec file, two drivers with different setup |
+| [two-phase-commit/](examples/two-phase-commit/) | a [Choreo](https://github.com/informalsystems/choreo) spec: all state in one variable, and transitions the spec has to name itself |
 
 Each is a self-contained project. They need `quint` on `PATH`
 (`npm i -g @informalsystems/quint`), because they generate traces rather than
@@ -240,8 +249,9 @@ tree — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 - Clojure 1.12+ on the JVM. ClojureScript is out of scope
   ([decision](docs/decisions/0005-clojure-only.md)).
-- [Quint](https://github.com/informalsystems/quint) on `PATH` for trace
-  *generation* (developed against 0.32.0). Trace *replay* needs nothing but
+- [Quint](https://github.com/informalsystems/quint) **0.33.0 or later** on
+  `PATH` for trace *generation*; older versions are refused, for the reason in
+  [0014](docs/decisions/0014-quint-floor.md). Trace *replay* needs nothing but
   Clojure — cached ITF files run in CI without Quint installed.
 - Apalache (fetched by `quint verify`) only for the verification mode.
 - [babashka](https://babashka.org/) only to use this repository's `bb` tasks,
@@ -258,13 +268,19 @@ examples/counter/              the getting-started tutorial, runnable
 examples/lru/                  a bug found only by interleaving
 examples/tokens/               verify: an invariant proved, and one broken
 examples/queue/                two drivers over one namespace
+examples/two-phase-commit/     a Choreo spec driving a Clojure two-phase commit
 dev/bank/                      annotated toy implementation of bank.qnt
+dev/tpc/                       annotated two-phase commit, for the Choreo fixtures
 dev/fixtures/                  example Quint spec + recorded ITF traces
+dev/fixtures/choreo/           vendored Choreo (Apache-2.0) + its recordings
 dev/probes/                    scripts that verified the claims in the docs
 docs/architecture.md
+docs/choreo.md                 testing against a Choreo spec, step by step
 docs/roadmap.md
+docs/techdebt.md               known gaps, written down and not scheduled
 docs/decisions/                ADRs — why the design is what it is
 docs/notes/                    observed behaviour of Quint and of var metadata
+docs/upstream/                 changes proposed to the tools this depends on
 CLAUDE.md                      working agreement for AI-assisted changes
 ```
 
@@ -284,3 +300,8 @@ Copyright © 2026 Aleksandr Bogdanov
 
 Distributed under the [Eclipse Public License 2.0](LICENSE), the same license
 as Clojure itself.
+
+The [Choreo](https://github.com/informalsystems/choreo) files vendored in
+`dev/fixtures/choreo/` and `examples/two-phase-commit/spec/choreo/` are
+Apache-2.0, with their licence beside them, and are not part of the library
+jar. See [0012](docs/decisions/0012-vendor-choreo.md).
